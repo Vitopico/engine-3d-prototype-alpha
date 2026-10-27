@@ -44,7 +44,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
         run: |
-          [ -n "$GH_TOKEN" ] || { echo "::error::secret UNIVERS_TOKEN absent ou vide"; exit 1; }
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::secret UNIVERS_TOKEN absent ou vide (variable du même nom : ${{ vars.UNIVERS_TOKEN != '' && 'présente' || 'absente' }} ; secrets d'environnement non lus par ce travail)"
+            exit 1
+          fi
           D=$(gh api "user/repos?per_page=100&visibility=private" --jq '[.[] | select(.private)][0].full_name' 2>/dev/null || true)
           if [ -z "$D" ]; then
             N=$(gh api "user/repos?per_page=100" --jq 'length' 2>&1 | tail -1)
@@ -76,7 +79,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
         run: |
-          [ -n "$GH_TOKEN" ] || { echo "::error::secret UNIVERS_TOKEN absent ou vide"; exit 1; }
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::secret UNIVERS_TOKEN absent ou vide (variable du même nom : ${{ vars.UNIVERS_TOKEN != '' && 'présente' || 'absente' }} ; secrets d'environnement non lus par ce travail)"
+            exit 1
+          fi
           D=$(gh api "user/repos?per_page=100&visibility=private" --jq '[.[] | select(.private)][0].full_name' 2>/dev/null || true)
           if [ -z "$D" ]; then
             N=$(gh api "user/repos?per_page=100" --jq 'length' 2>&1 | tail -1)
