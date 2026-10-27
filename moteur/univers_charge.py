@@ -19,6 +19,7 @@ def univers():
     global _U
     if _U is None:
         d = dossier()
+        os.environ.setdefault("MOTEUR", ICI)       # l'univers retrouve le moteur par cette variable
         if d not in sys.path:
             sys.path.insert(0, d)
         if ICI not in sys.path:
