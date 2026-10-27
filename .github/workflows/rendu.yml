@@ -2,8 +2,9 @@ name: rendu
 # Rendu d'une scène avec Blender (GPL) sur plusieurs machines en parallèle.
 # L'univers (personnages, décors, scripts) peut vivre dans un dépôt PRIVÉ : il est lu au moment du rendu avec la clé
 # secrète UNIVERS_TOKEN, et les images rendues repartent dans une release de ce dépôt privé (rien n'est publié ici).
-# Réglages du dépôt : variable UNIVERS_DEPOT (propriétaire/dépôt) et UNIVERS_DOSSIER (dossier de l'univers dans ce dépôt),
-# secret UNIVERS_TOKEN (jeton à grain fin : accès en lecture et écriture au contenu de ce seul dépôt).
+# Réglage du dépôt : secret UNIVERS_TOKEN (jeton à grain fin, accès en lecture et écriture au contenu d'UN dépôt privé,
+# celui de l'univers). Le dépôt privé est trouvé avec ce jeton et son nom est masqué dans les journaux. Facultatif :
+# variable UNIVERS_DOSSIER (dossier de l'univers dans ce dépôt, « univers » par défaut).
 # Sans univers privé : travail « exemple » (univers d'exemple du moteur), images en artefact.
 on:
   workflow_dispatch:
@@ -34,12 +35,22 @@ jobs:
         run: |
           F=$(curl -sL "https://download.blender.org/release/Blender4.5/" | grep -o "blender-4\.5\.[0-9]*-linux-x64\.tar\.xz" | sort -V | uniq | tail -1)
           echo "file=$F" >> "$GITHUB_OUTPUT"
+      - name: Dépôt de l'univers
+        id: d
+        if: ${{ inputs.travail != 'exemple' }}
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
+        run: |
+          D=$(gh api "user/repos?per_page=100" --jq '[.[] | select(.private)][0].full_name')
+          echo "::add-mask::$D"
+          [ -n "$D" ] || { echo "Aucun dépôt privé accessible avec UNIVERS_TOKEN"; exit 1; }
+          echo "depot=$D" >> "$GITHUB_ENV"
       - name: Release privée pour les images
         if: steps.m.outputs.prive == '1'
         env:
           GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
         run: |
-          gh release create "rendu-${{ github.run_id }}" --repo "${{ vars.UNIVERS_DEPOT }}" --title "rendu ${{ github.run_id }}" \
+          gh release create "rendu-${{ github.run_id }}" --repo "$depot" --title "rendu ${{ github.run_id }}" \
             --notes "travail ${{ inputs.travail }}, moteur ${{ github.sha }}" > /dev/null
   rendu:
     needs: plan
@@ -52,18 +63,28 @@ jobs:
         morceau: ${{ fromJson(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Dépôt de l'univers
+        id: d
+        if: ${{ inputs.travail != 'exemple' }}
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
+        run: |
+          D=$(gh api "user/repos?per_page=100" --jq '[.[] | select(.private)][0].full_name')
+          echo "::add-mask::$D"
+          [ -n "$D" ] || { echo "Aucun dépôt privé accessible avec UNIVERS_TOKEN"; exit 1; }
+          echo "depot=$D" >> "$GITHUB_ENV"
       - name: Univers privé
         if: needs.plan.outputs.prive == '1'
         uses: actions/checkout@v4
         with:
-          repository: ${{ vars.UNIVERS_DEPOT }}
+          repository: ${{ env.depot }}
           token: ${{ secrets.UNIVERS_TOKEN }}
           path: prive
           submodules: false
       - name: Choix de l'univers
         id: u
         run: |
-          if [ "${{ needs.plan.outputs.prive }}" = "1" ]; then U="$PWD/prive/${{ vars.UNIVERS_DOSSIER }}"; else U="$PWD/exemple"; fi
+          if [ "${{ needs.plan.outputs.prive }}" = "1" ]; then U="$PWD/prive/${{ vars.UNIVERS_DOSSIER || 'univers' }}"; else U="$PWD/exemple"; fi
           echo "dir=$U" >> "$GITHUB_OUTPUT"
           python3 -c "import json,sys;t=json.load(open('$U/travaux/${{ inputs.travail }}.json'));print(t.get('script','moteur/tournage_rendu.py'))" > /dev/null
       - uses: actions/cache@v4
@@ -126,7 +147,7 @@ jobs:
           GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
         run: |
           tar -cf "images-${{ matrix.morceau }}.tar" -C out .
-          gh release upload "rendu-${{ github.run_id }}" "images-${{ matrix.morceau }}.tar" --repo "${{ vars.UNIVERS_DEPOT }}" > /dev/null
+          gh release upload "rendu-${{ github.run_id }}" "images-${{ matrix.morceau }}.tar" --repo "$depot" > /dev/null
       - name: Envoi des images (exemple)
         if: needs.plan.outputs.prive == '0'
         uses: actions/upload-artifact@v4
