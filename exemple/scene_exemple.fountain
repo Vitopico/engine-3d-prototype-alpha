@@ -1,0 +1,30 @@
+Title: Scène d'exemple — le mannequin de l'atelier
+Credit: Engine 3D Prototype (Alpha)
+Notes: Exemple du format de script de tournage. Les notes [[…]] pilotent le moteur ; (parenthèse) = émotion de la voix.
+
+INT. ATELIER - FIN D'APRÈS-MIDI
+
+[[lieu: atelier | acteurs: robin=mannequin | places: robin=-0.4,-0.5 | entrees: robin=-2.2,-0.9 | faces: robin=-20]]
+
+[[plan: A.1 | cadrage: plan_moyen | sujet: robin | camera: fixe]]
+
+Robin entre et s'arrête près de la table. [[geste: marche | duree: 2.4]]
+
+ROBIN
+(curieux, émerveillé)
+Tiens… quelqu'un a laissé une lanterne allumée.
+[[geste: reflechit | regard: lanterne]]
+
+[[plan: A.2 | cadrage: gros_plan | sujet: robin | camera: avancee_lente]]
+
+ROBIN
+(amusé)
+Bon. Je ne touche à rien.
+[[geste: mains_dans_le_dos | regard: camera]]
+
+[[plan: A.3 | cadrage: plan_moyen | sujet: robin | camera: fixe]]
+
+ROBIN
+(plein d'élan)
+Allez, au travail !
+[[geste: saut_joie | regard: camera | son: boing]]

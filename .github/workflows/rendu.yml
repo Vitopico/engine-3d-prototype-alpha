@@ -1,0 +1,135 @@
+name: rendu
+# Rendu d'une scène avec Blender (GPL) sur plusieurs machines en parallèle.
+# L'univers (personnages, décors, scripts) peut vivre dans un dépôt PRIVÉ : il est lu au moment du rendu avec la clé
+# secrète UNIVERS_TOKEN, et les images rendues repartent dans une release de ce dépôt privé (rien n'est publié ici).
+# Réglages du dépôt : variable UNIVERS_DEPOT (propriétaire/dépôt) et UNIVERS_DOSSIER (dossier de l'univers dans ce dépôt),
+# secret UNIVERS_TOKEN (jeton à grain fin : accès en lecture et écriture au contenu de ce seul dépôt).
+# Sans univers privé : travail « exemple » (univers d'exemple du moteur), images en artefact.
+on:
+  workflow_dispatch:
+    inputs:
+      travail:
+        description: "travail à rendre (fichier travaux/<travail>.json de l'univers ; « exemple » = scène d'exemple)"
+        required: true
+        default: "exemple"
+      morceaux:
+        description: "machines en parallèle (1 à 20)"
+        required: true
+        default: "4"
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      prive: ${{ steps.m.outputs.prive }}
+      blender: ${{ steps.b.outputs.file }}
+    steps:
+      - id: m
+        run: |
+          python3 -c "import json;n=max(1,min(20,int('${{ inputs.morceaux }}')));print('matrix='+json.dumps(list(range(n))))" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.travail }}" = "exemple" ]; then echo "prive=0" >> "$GITHUB_OUTPUT"; else echo "prive=1" >> "$GITHUB_OUTPUT"; fi
+      - id: b
+        run: |
+          F=$(curl -sL "https://download.blender.org/release/Blender4.5/" | grep -o "blender-4\.5\.[0-9]*-linux-x64\.tar\.xz" | sort -V | uniq | tail -1)
+          echo "file=$F" >> "$GITHUB_OUTPUT"
+      - name: Release privée pour les images
+        if: steps.m.outputs.prive == '1'
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
+        run: |
+          gh release create "rendu-${{ github.run_id }}" --repo "${{ vars.UNIVERS_DEPOT }}" --title "rendu ${{ github.run_id }}" \
+            --notes "travail ${{ inputs.travail }}, moteur ${{ github.sha }}" > /dev/null
+  rendu:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        morceau: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Univers privé
+        if: needs.plan.outputs.prive == '1'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.UNIVERS_DEPOT }}
+          token: ${{ secrets.UNIVERS_TOKEN }}
+          path: prive
+          submodules: false
+      - name: Choix de l'univers
+        id: u
+        run: |
+          if [ "${{ needs.plan.outputs.prive }}" = "1" ]; then U="$PWD/prive/${{ vars.UNIVERS_DOSSIER }}"; else U="$PWD/exemple"; fi
+          echo "dir=$U" >> "$GITHUB_OUTPUT"
+          python3 -c "import json,sys;t=json.load(open('$U/travaux/${{ inputs.travail }}.json'));print(t.get('script','moteur/tournage_rendu.py'))" > /dev/null
+      - uses: actions/cache@v4
+        with:
+          path: ~/blender-dl
+          key: ${{ needs.plan.outputs.blender }}
+      - name: Blender
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 > /dev/null
+          F="${{ needs.plan.outputs.blender }}"
+          mkdir -p ~/blender-dl ~/blender
+          [ -f ~/blender-dl/$F ] || curl -sL -o ~/blender-dl/$F "https://download.blender.org/release/Blender4.5/$F"
+          tar -xf ~/blender-dl/$F -C ~/blender --strip-components=1
+          ~/blender/blender --version | head -1
+      - name: Liste des ressources
+        id: r
+        env:
+          UNIVERS: ${{ steps.u.outputs.dir }}
+        run: |
+          IDS=$(python3 -c "import sys;sys.path.insert(0,'moteur');import univers_charge as u;print(','.join(u.get('RESSOURCES',[])))")
+          echo "ids=$IDS" >> "$GITHUB_OUTPUT"
+          echo "cle=$(echo -n "$IDS" | sha1sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ressources
+          key: polyhaven-${{ steps.r.outputs.cle }}
+      - name: Ressources Poly Haven (CC0)
+        run: |
+          [ -f ressources/registre.json ] || python3 moteur/ressources_polyhaven.py ressources "ids=${{ steps.r.outputs.ids }}" > /dev/null
+          python3 -c "import json;print(len(json.load(open('ressources/registre.json'))), 'ressources')"
+      - name: Préparation (minutage)
+        env:
+          UNIVERS: ${{ steps.u.outputs.dir }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          U = os.environ["UNIVERS"]
+          t = json.load(open(os.path.join(U, "travaux", "${{ inputs.travail }}.json")))
+          if t.get("minutage"):
+              m = os.path.join(U, t["minutage"])
+          else:
+              subprocess.run(["python3", "moteur/tournage.py", "lire", os.path.join(U, t["fountain"]), "tournage.json"], check=True)
+              subprocess.run(["python3", "moteur/tournage.py", "minuter", "tournage.json", os.path.join(U, t.get("voix", "voix")), "minutage.json"], check=True, stdout=subprocess.DEVNULL)
+              m = "minutage.json"
+          open("travail.env", "w").write(f"SCRIPT={t.get('script', 'moteur/tournage_rendu.py')}\nARGS={t['args']} minutage={os.path.abspath(m)}\n")
+          PY
+      - name: Rendu
+        env:
+          UNIVERS: ${{ steps.u.outputs.dir }}
+        run: |
+          source travail.env
+          mkdir -p out
+          START=$(date +%s)
+          ~/blender/blender -b --factory-startup -noaudio -P "$SCRIPT" -- ${{ matrix.morceau }} ${{ strategy.job-total }} out $ARGS res=$PWD/ressources univers=$UNIVERS > rendu.log 2>&1 || { grep -E "Error|Traceback" -A3 rendu.log | grep -v -i "File \"" | tail -5; exit 1; }
+          echo "morceau ${{ matrix.morceau }} : $(ls out/*.png | wc -l) images en $(( $(date +%s) - START )) s"
+      - name: Envoi des images (dépôt privé)
+        if: needs.plan.outputs.prive == '1'
+        env:
+          GH_TOKEN: ${{ secrets.UNIVERS_TOKEN }}
+        run: |
+          tar -cf "images-${{ matrix.morceau }}.tar" -C out .
+          gh release upload "rendu-${{ github.run_id }}" "images-${{ matrix.morceau }}.tar" --repo "${{ vars.UNIVERS_DEPOT }}" > /dev/null
+      - name: Envoi des images (exemple)
+        if: needs.plan.outputs.prive == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: images-${{ matrix.morceau }}
+          path: out/

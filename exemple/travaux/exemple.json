@@ -1,0 +1,6 @@
+{
+  "note": "Travail de rendu : scène d'exemple du moteur, rendue à 50 % de 1280×720, 16 échantillons.",
+  "fountain": "scene_exemple.fountain",
+  "script": "moteur/tournage_rendu.py",
+  "args": "rendu pct=50 samples=16 rapide=1"
+}
