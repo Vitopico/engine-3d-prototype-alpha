@@ -19,6 +19,9 @@ on:
         default: "4"
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash        # bash -eo pipefail : une commande qui échoue arrête l'étape
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -105,9 +108,10 @@ jobs:
           sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 > /dev/null
           F="${{ needs.plan.outputs.blender }}"
           mkdir -p ~/blender-dl ~/blender
-          [ -f ~/blender-dl/$F ] || curl -sL -o ~/blender-dl/$F "https://download.blender.org/release/Blender4.5/$F"
+          [ -n "$F" ] || { echo "::error::version de Blender introuvable"; exit 1; }
+          [ -s ~/blender-dl/$F ] || curl -fsSL -o ~/blender-dl/$F "https://download.blender.org/release/Blender4.5/$F"
           tar -xf ~/blender-dl/$F -C ~/blender --strip-components=1
-          ~/blender/blender --version | head -1
+          echo "::notice::$(~/blender/blender --version 2>/dev/null | head -1)"
       - name: Liste des ressources
         id: r
         env:
@@ -122,8 +126,8 @@ jobs:
           key: polyhaven-${{ steps.r.outputs.cle }}
       - name: Ressources Poly Haven (CC0)
         run: |
-          [ -f ressources/registre.json ] || python3 moteur/ressources_polyhaven.py ressources "ids=${{ steps.r.outputs.ids }}" > /dev/null
-          python3 -c "import json;print(len(json.load(open('ressources/registre.json'))), 'ressources')"
+          [ -f ressources/registre.json ] || python3 moteur/ressources_polyhaven.py ressources "ids=${{ steps.r.outputs.ids }}" > polyhaven.log 2>&1 || { tail -5 polyhaven.log; exit 1; }
+          echo "::notice::$(python3 -c "import json;print(len(json.load(open('ressources/registre.json'))))") ressources Poly Haven"
       - name: Préparation (minutage)
         env:
           UNIVERS: ${{ steps.u.outputs.dir }}
@@ -138,7 +142,10 @@ jobs:
               subprocess.run(["python3", "moteur/tournage.py", "lire", os.path.join(U, t["fountain"]), "tournage.json"], check=True)
               subprocess.run(["python3", "moteur/tournage.py", "minuter", "tournage.json", os.path.join(U, t.get("voix", "voix")), "minutage.json"], check=True, stdout=subprocess.DEVNULL)
               m = "minutage.json"
-          open("travail.env", "w").write(f"SCRIPT={t.get('script', 'moteur/tournage_rendu.py')}\nARGS={t['args']} minutage={os.path.abspath(m)}\n")
+          import shlex
+          open("travail.env", "w").write(f"SCRIPT={shlex.quote(t.get('script', 'moteur/tournage_rendu.py'))}\n"
+                                         f"ARGS={shlex.quote(t['args'] + ' minutage=' + os.path.abspath(m))}\n")
+          print(f"::notice::minutage prêt ({json.load(open(m))['duree']} s)")
           PY
       - name: Rendu
         env:
@@ -147,8 +154,13 @@ jobs:
           source travail.env
           mkdir -p out
           START=$(date +%s)
-          ~/blender/blender -b --factory-startup -noaudio -P "$SCRIPT" -- ${{ matrix.morceau }} ${{ strategy.job-total }} out $ARGS res=$PWD/ressources univers=$UNIVERS > rendu.log 2>&1 || { grep -E "Error|Traceback" -A3 rendu.log | grep -v -i "File \"" | tail -5; exit 1; }
-          echo "morceau ${{ matrix.morceau }} : $(ls out/*.png | wc -l) images en $(( $(date +%s) - START )) s"
+          ~/blender/blender -b --factory-startup -noaudio --python-exit-code 1 -P "$SCRIPT" -- ${{ matrix.morceau }} ${{ strategy.job-total }} out $ARGS res=$PWD/ressources univers=$UNIVERS > rendu.log 2>&1 || true
+          N=$(ls out/*.png 2>/dev/null | wc -l)
+          if [ "$N" -eq 0 ]; then
+            echo "::error::aucune image : $(grep -E 'Error|error:' rendu.log | grep -v -i 'file \"' | tail -2 | tr '\n' ' ' | cut -c1-300)"
+            exit 1
+          fi
+          echo "::notice::morceau ${{ matrix.morceau }} : $N images en $(( $(date +%s) - START )) s"
       - name: Envoi des images (dépôt privé)
         if: needs.plan.outputs.prive == '1'
         env:
@@ -162,3 +174,4 @@ jobs:
         with:
           name: images-${{ matrix.morceau }}
           path: out/
+          if-no-files-found: error
