@@ -48,7 +48,7 @@ jobs:
             echo "::error::secret UNIVERS_TOKEN absent ou vide (variable du même nom : ${{ vars.UNIVERS_TOKEN != '' && 'présente' || 'absente' }} ; secrets d'environnement non lus par ce travail)"
             exit 1
           fi
-          D=$(gh api "user/repos?per_page=100&visibility=private" --jq '[.[] | select(.private)][0].full_name' 2>/dev/null || true)
+          D=$(gh api "user/repos?per_page=100" --jq '[.[] | select(.full_name != "${{ github.repository }}")] | (map(select(.private)) + .)[0].full_name // ""' 2>/dev/null || true)
           if [ -z "$D" ]; then
             N=$(gh api "user/repos?per_page=100" --jq 'length' 2>&1 | tail -1)
             echo "::error::aucun dépôt privé trouvé avec UNIVERS_TOKEN (dépôts visibles : $N)"; exit 1
@@ -83,7 +83,7 @@ jobs:
             echo "::error::secret UNIVERS_TOKEN absent ou vide (variable du même nom : ${{ vars.UNIVERS_TOKEN != '' && 'présente' || 'absente' }} ; secrets d'environnement non lus par ce travail)"
             exit 1
           fi
-          D=$(gh api "user/repos?per_page=100&visibility=private" --jq '[.[] | select(.private)][0].full_name' 2>/dev/null || true)
+          D=$(gh api "user/repos?per_page=100" --jq '[.[] | select(.full_name != "${{ github.repository }}")] | (map(select(.private)) + .)[0].full_name // ""' 2>/dev/null || true)
           if [ -z "$D" ]; then
             N=$(gh api "user/repos?per_page=100" --jq 'length' 2>&1 | tail -1)
             echo "::error::aucun dépôt privé trouvé avec UNIVERS_TOKEN (dépôts visibles : $N)"; exit 1
