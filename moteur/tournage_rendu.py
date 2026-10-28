@@ -28,10 +28,75 @@ CADRE = {  # distance (m), hauteur visée (m, repère du personnage), focale (mm
 HAUTEUR_CAM = {"plongee": 1.35, "contre_plongee": -0.75}     # caméra plus haute (le personnage paraît petit) ou plus basse
 
 
-def place_camera(cam, pl, base, regard, u, t=0.0, echelle=1.0, yeux=None):
+def angle_degage(pl, base, regard, sujets, autres, t, echelle=1.0):
+    """Décalage d'angle (degrés) pour qu'aucun autre personnage ne masque le sujet du plan : on teste la ligne
+    caméra → visage contre un cylindre autour de chaque autre personnage, au milieu du plan, et on tourne la caméra
+    par pas de 12° (d'un côté puis de l'autre) jusqu'à une vue dégagée. Calcul simple et déterministe."""
+    if not autres or pl["cadrage"] in ("plan_large",):
+        return 0.0
+    d, hz, lens, ang = CADRE.get(pl["cadrage"], CADRE["plan_moyen"])
+    d, hz = d * echelle, hz * echelle
+    cible = base + Vector((0, 0, hz))
+    obst = []
+    for a_ in autres:
+        p = a_.position(t)[0]
+        obst.append((Vector((p.x, p.y)), 0.3 * a_.taille / 1.45 + 0.08, a_.taille))
+
+    def masque(extra):
+        a = math.atan2(regard.y, regard.x) + math.radians(ang + extra)
+        cam = base + Vector((math.cos(a) * d, math.sin(a) * d, 0)) + Vector((0, 0, hz))
+        c2, b2 = Vector((cam.x, cam.y)), Vector((cible.x, cible.y))
+        for (o, r, h) in obst:
+            ab = b2 - c2
+            u = max(0.0, min(1.0, (o - c2).dot(ab) / max(ab.length_squared, 1e-9)))
+            if u > 0.97:
+                continue
+            z = cam.z + (cible.z - cam.z) * u
+            if (o - (c2 + ab * u)).length < r and z < h * 1.05:
+                return True
+        return False
+    for extra in (0, 12, -12, 24, -24, 36, -36, 48, -48, 60, -60):
+        if not masque(extra):
+            return float(extra)
+    return 0.0
+
+def eclairage_cinema(acteurs, centre=Vector((0, 0, 0))):
+    """Lumière « de cinéma » sur les personnages seulement (liaison de lumière) : un contre-jour chaud qui détache la
+    silhouette du fond, et une douce lumière de face qui fait briller les yeux. Le décor garde sa propre lumière."""
+    coll = bpy.data.collections.new("personnages_eclaires")
+    bpy.context.scene.collection.children.link(coll)
+    for a_ in acteurs.values():
+        objs = []
+        for att in ("p", "b", "g"):
+            o = getattr(a_, att, None)
+            r = getattr(o, "root", None) if o is not None else None
+            if r is not None:
+                objs.append(r)
+        for r in objs:
+            for o in [r] + list(r.children_recursive):
+                if o.type in ("MESH", "CURVE") and o.name not in coll.objects:
+                    coll.objects.link(o)
+    lum = []
+    for nom, energie, taille, col, pos in (("contre_jour", 260, 1.2, "#ffd9a8", (1.6, 2.6, 2.4)),
+                                          ("contre_jour_froid", 120, 1.0, "#bcd4ff", (-2.2, 2.0, 1.8)),
+                                          ("face_yeux", 45, 2.5, "#fff3e6", (0.0, -3.0, 1.3))):
+        L = bpy.data.lights.new(nom, "AREA"); L.energy = energie; L.size = taille; L.color = lin(col)
+        o = new_obj(nom, L)
+        o.location = centre + Vector(pos)
+        o.rotation_mode = "QUATERNION"
+        o.rotation_quaternion = (centre + Vector((0, 0, 0.8)) - o.location).to_track_quat("-Z", "Y")
+        try:
+            o.light_linking.receiver_collection = coll
+        except Exception as e:
+            print("liaison de lumière absente :", e)
+        lum.append(o)
+    return lum
+
+def place_camera(cam, pl, base, regard, u, t=0.0, echelle=1.0, yeux=None, extra=0.0):
     """Caméra d'après le cadrage et le mouvement écrits. Mouvements : fixe, avancee_lente, recul, orbite (tourne autour,
     pour montrer un objet sous tous les angles), secousse (impact), penchee (la situation bascule)."""
     d, hz, lens, ang = CADRE.get(pl["cadrage"], CADRE["plan_moyen"])
+    ang += extra
     d, hz = d * echelle, hz * echelle                 # cadrage à la taille du personnage (calculé pour 1,45 m)
     if yeux is not None and pl["cadrage"] in ("gros_plan", "tres_gros_plan"):
         hz = yeux                                     # gros plan : on vise les yeux
@@ -180,6 +245,27 @@ def main():
                 acteurs[qui].ajouter_element(el)
     for a_ in acteurs.values():
         a_.finir()
+    if OPTS.get("eclairage") == "cinema":          # lumière de cinéma sur les personnages, couleurs de film (AgX)
+        centre = sum((a_.place for a_ in acteurs.values()), Vector()) / max(len(acteurs), 1)
+        eclairage_cinema(acteurs, centre)
+        if "vt" not in OPTS:
+            try:
+                sc.view_settings.view_transform = "AgX"
+                sc.view_settings.look = OPTS.get("look", "AgX - Base Contrast")
+            except Exception as e:
+                print("AgX absent :", e)
+    degage = {}                                     # angle de caméra dégagé, un par plan (pas de saut dans un plan)
+    for pl in M["plans"]:
+        suj = [acteurs[s_] for s_ in (pl.get("sujet") or []) if s_ in acteurs] or [next(iter(acteurs.values()))]
+        autres = [a_ for a_ in acteurs.values() if a_ not in suj]
+        tm = (pl["t0"] + pl["t1"]) / 2
+        base = sum((s_.position(tm)[0] for s_ in suj), Vector()) / len(suj)
+        face = sum(s_.face for s_ in suj) / len(suj)
+        taille = max(s_.taille for s_ in suj) * (1.0 + 0.35 * (len(suj) - 1))
+        degage[pl["id"]] = angle_degage(pl, base, Vector((math.sin(face), -math.cos(face), 0)), suj, autres, tm, taille / 1.45) \
+            if OPTS.get("degager", "1") == "1" else 0.0
+        if degage[pl["id"]]:
+            print(f"plan {pl['id']} : caméra tournée de {degage[pl['id']]:+.0f}° pour dégager le sujet", flush=True)
     cam = camera("cam_tournage", (0, -3, 1), (0, 0, 0.8), 35, 2.8)
     sc.camera = cam
     n = int(M["duree"] * FPS)
@@ -218,7 +304,8 @@ def main():
         face = sum(s.face for s in suj) / len(suj)
         regard_dir = Vector((math.sin(face), -math.cos(face), 0))
         bpy.context.view_layer.update()
-        place_camera(cam, pl, base, regard_dir, u, t_reel, echelle=taille / 1.45, yeux=max(s.tete_z for s in suj))
+        place_camera(cam, pl, base, regard_dir, u, t_reel, echelle=taille / 1.45, yeux=max(s.tete_z for s in suj),
+                     extra=degage.get(pl["id"], 0.0))
         sc.render.filepath = os.path.join(OUT, f"t{f:04d}.png")
         if OPTS.get("reprendre", "1") == "1" and os.path.exists(sc.render.filepath) and os.path.getsize(sc.render.filepath) > 1000:
             continue   # reprise après coupure : image déjà faite

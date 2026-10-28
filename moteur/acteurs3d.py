@@ -81,6 +81,13 @@ class Acteur:
             return max(-35, min(35, math.degrees(d))), 10
         return {"sol": (0, -25), "doigt": (10, -15)}.get(c, (0, 0))
 
+    def regard_doux(self, t, acteurs, objets, freq=2.2, amorti=0.75):
+        """Regard qui glisse vers sa nouvelle cible (yeux et tête ne sautent pas d'un coup) : ressort presque sans rebond."""
+        import secondaire
+        if not hasattr(self, "_ressort_regard"):
+            self._ressort_regard = secondaire.Ressort(freq, amorti, fenetre=1.0, pas=1 / 120)
+        return self._ressort_regard.suivre(lambda u: self.regard(u, acteurs, objets), t)
+
 def classes():
     """Classes d'acteurs de l'univers chargé (nom utilisé dans le script → classe)."""
     import univers_charge
