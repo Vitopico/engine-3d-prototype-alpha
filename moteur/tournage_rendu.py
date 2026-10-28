@@ -33,32 +33,46 @@ def angle_degage(pl, base, regard, sujets, autres, t, echelle=1.0):
     caméra → visage contre un cylindre autour de chaque autre personnage, au milieu du plan, et on tourne la caméra
     par pas de 12° (d'un côté puis de l'autre) jusqu'à une vue dégagée. Calcul simple et déterministe."""
     if not autres or pl["cadrage"] in ("plan_large",):
-        return 0.0
+        return 0.0, 1.0
     d, hz, lens, ang = CADRE.get(pl["cadrage"], CADRE["plan_moyen"])
     d, hz = d * echelle, hz * echelle
     cible = base + Vector((0, 0, hz))
     obst = []
     for a_ in autres:
         p = a_.position(t)[0]
-        obst.append((Vector((p.x, p.y)), 0.3 * a_.taille / 1.45 + 0.08, a_.taille))
+        r = getattr(a_, "rayon", None) or (0.3 * a_.taille / 1.45 + 0.08)
+        obst.append((Vector((p.x, p.y)), r, a_.taille))
+    seul = pl["cadrage"] in ("gros_plan", "tres_gros_plan")      # plan serré sur UN personnage : les autres hors champ
 
-    def masque(extra):
+    def marge(extra, f):
+        """> 0 : vue dégagée. Pour un plan serré, écart angulaire entre le bord du cadre et l'autre personnage."""
         a = math.atan2(regard.y, regard.x) + math.radians(ang + extra)
-        cam = base + Vector((math.cos(a) * d, math.sin(a) * d, 0)) + Vector((0, 0, hz))
+        cam = base + Vector((math.cos(a) * d * f, math.sin(a) * d * f, 0)) + Vector((0, 0, hz))
+        demi = math.atan(18.0 / (lens * f)) * 1.04                # demi-angle horizontal (capteur 36 mm)
         c2, b2 = Vector((cam.x, cam.y)), Vector((cible.x, cible.y))
+        axe = (b2 - c2).normalized()
+        m = 1.0
         for (o, r, h) in obst:
             ab = b2 - c2
             u = max(0.0, min(1.0, (o - c2).dot(ab) / max(ab.length_squared, 1e-9)))
-            if u > 0.97:
-                continue
             z = cam.z + (cible.z - cam.z) * u
-            if (o - (c2 + ab * u)).length < r and z < h * 1.05:
-                return True
-        return False
-    for extra in (0, 12, -12, 24, -24, 36, -36, 48, -48, 60, -60):
-        if not masque(extra):
-            return float(extra)
-    return 0.0
+            if u < 0.97 and (o - (c2 + ab * u)).length < r and z < h * 1.05:
+                m = min(m, -1.0)                                  # il cache le visage
+            if seul:
+                v = o - c2
+                if v.length > 1e-3 and v.dot(axe) > 0:
+                    ecart = math.acos(max(-1.0, min(1.0, v.normalized().dot(axe)))) - math.atan(r / v.length)
+                    m = min(m, ecart - demi)                      # < 0 : il entre dans le cadre
+        return m
+    essais = [(e, f) for f in (1.0, 1.4, 1.8) for e in (0, 12, -12, 24, -24, 36, -36, 48, -48)]
+    for e, f in essais:
+        if marge(e, f) > 0:
+            return float(e), f
+    # impossible de le sortir du cadre (personnages trop proches) : on le repousse le plus possible vers le bord,
+    # en flou de premier plan (amorce), seulement si le gain est net
+    m0 = marge(0, 1.0)
+    e, f = max(essais, key=lambda ef: marge(*ef) - 0.002 * abs(ef[0]))
+    return (float(e), f) if marge(e, f) > m0 + 0.04 else (0.0, 1.0)
 
 def eclairage_cinema(acteurs, centre=Vector((0, 0, 0))):
     """Lumière « de cinéma » sur les personnages seulement (liaison de lumière) : un contre-jour chaud qui détache la
@@ -77,9 +91,9 @@ def eclairage_cinema(acteurs, centre=Vector((0, 0, 0))):
                 if o.type in ("MESH", "CURVE") and o.name not in coll.objects:
                     coll.objects.link(o)
     lum = []
-    for nom, energie, taille, col, pos in (("contre_jour", 260, 1.2, "#ffd9a8", (1.6, 2.6, 2.4)),
-                                          ("contre_jour_froid", 120, 1.0, "#bcd4ff", (-2.2, 2.0, 1.8)),
-                                          ("face_yeux", 45, 2.5, "#fff3e6", (0.0, -3.0, 1.3))):
+    for nom, energie, taille, col, pos in (("contre_jour", 550, 0.8, "#ffd2a0", (1.4, 2.2, 2.0)),
+                                          ("contre_jour_froid", 380, 0.8, "#b4ccff", (-1.9, 1.8, 1.6)),
+                                          ("face_yeux", 12, 2.5, "#fff3e6", (0.0, -3.0, 1.3))):
         L = bpy.data.lights.new(nom, "AREA"); L.energy = energie; L.size = taille; L.color = lin(col)
         o = new_obj(nom, L)
         o.location = centre + Vector(pos)
@@ -92,11 +106,12 @@ def eclairage_cinema(acteurs, centre=Vector((0, 0, 0))):
         lum.append(o)
     return lum
 
-def place_camera(cam, pl, base, regard, u, t=0.0, echelle=1.0, yeux=None, extra=0.0):
+def place_camera(cam, pl, base, regard, u, t=0.0, echelle=1.0, yeux=None, extra=0.0, focale=1.0):
     """Caméra d'après le cadrage et le mouvement écrits. Mouvements : fixe, avancee_lente, recul, orbite (tourne autour,
     pour montrer un objet sous tous les angles), secousse (impact), penchee (la situation bascule)."""
     d, hz, lens, ang = CADRE.get(pl["cadrage"], CADRE["plan_moyen"])
     ang += extra
+    d, lens = d * focale, lens * focale          # focale plus longue, caméra plus loin : même taille, champ plus étroit
     d, hz = d * echelle, hz * echelle                 # cadrage à la taille du personnage (calculé pour 1,45 m)
     if yeux is not None and pl["cadrage"] in ("gros_plan", "tres_gros_plan"):
         hz = yeux                                     # gros plan : on vise les yeux
@@ -248,10 +263,10 @@ def main():
     if OPTS.get("eclairage") == "cinema":          # lumière de cinéma sur les personnages, couleurs de film (AgX)
         centre = sum((a_.place for a_ in acteurs.values()), Vector()) / max(len(acteurs), 1)
         eclairage_cinema(acteurs, centre)
-        if "vt" not in OPTS:
+        if OPTS.get("vt") == "AgX":                # couleurs de film : à réserver aux décors très contrastés (pâlit les verts)
             try:
                 sc.view_settings.view_transform = "AgX"
-                sc.view_settings.look = OPTS.get("look", "AgX - Base Contrast")
+                sc.view_settings.look = OPTS.get("look", "AgX - Punchy")
             except Exception as e:
                 print("AgX absent :", e)
     degage = {}                                     # angle de caméra dégagé, un par plan (pas de saut dans un plan)
@@ -263,9 +278,9 @@ def main():
         face = sum(s_.face for s_ in suj) / len(suj)
         taille = max(s_.taille for s_ in suj) * (1.0 + 0.35 * (len(suj) - 1))
         degage[pl["id"]] = angle_degage(pl, base, Vector((math.sin(face), -math.cos(face), 0)), suj, autres, tm, taille / 1.45) \
-            if OPTS.get("degager", "1") == "1" else 0.0
-        if degage[pl["id"]]:
-            print(f"plan {pl['id']} : caméra tournée de {degage[pl['id']]:+.0f}° pour dégager le sujet", flush=True)
+            if OPTS.get("degager", "1") == "1" else (0.0, 1.0)
+        if degage[pl["id"]] != (0.0, 1.0):
+            print(f"plan {pl['id']} : caméra tournée de {degage[pl['id']][0]:+.0f}°, focale ×{degage[pl['id']][1]} pour dégager le sujet", flush=True)
     cam = camera("cam_tournage", (0, -3, 1), (0, 0, 0.8), 35, 2.8)
     sc.camera = cam
     n = int(M["duree"] * FPS)
@@ -305,7 +320,10 @@ def main():
         regard_dir = Vector((math.sin(face), -math.cos(face), 0))
         bpy.context.view_layer.update()
         place_camera(cam, pl, base, regard_dir, u, t_reel, echelle=taille / 1.45, yeux=max(s.tete_z for s in suj),
-                     extra=degage.get(pl["id"], 0.0))
+                     extra=degage.get(pl["id"], (0.0, 1.0))[0], focale=degage.get(pl["id"], (0.0, 1.0))[1])
+        if OPTS.get("debug") == "1":
+            print("DEBUG", f, pl["id"], tuple(round(x, 2) for x in cam.location), {k: tuple(round(x, 2) for x in a_.position(t)[0]) for k, a_ in acteurs.items()}, flush=True)
+            continue
         sc.render.filepath = os.path.join(OUT, f"t{f:04d}.png")
         if OPTS.get("reprendre", "1") == "1" and os.path.exists(sc.render.filepath) and os.path.getsize(sc.render.filepath) > 1000:
             continue   # reprise après coupure : image déjà faite
