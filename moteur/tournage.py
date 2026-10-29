@@ -6,6 +6,8 @@ Format (Fountain, lisible comme un vrai scénario) :
   - en-tête « Clé: valeur » ; INT./EXT. = scène ; NOM EN MAJUSCULES = réplique ; (parenthèse) = émotion ;
   - notes moteur [[clé: valeur | clé: valeur]] : plan, cadrage, sujet, vers, camera, geste, regard, son, duree, lieu,
     ambiance, musique. Une note qui contient « plan: » ouvre un nouveau plan.
+  - les clés inconnues sont gardées sans effet : la chaîne d'écriture (moteur/ecrire.py) y ajoute partie, beat, lecon,
+    epreuve, source, phrase_cle, mot_nouveau, pose, paye, apprend ; les sections « # … » et résumés « = … » sont ignorés.
 
 Usage :
   python tournage.py lire <scenario.fountain> <sortie.json>
@@ -88,8 +90,8 @@ def lire(path):
     while i < len(lignes):
         l = lignes[i].rstrip()
         s = l.strip()
-        if not s:
-            i += 1
+        if not s or s.startswith("#") or s.startswith("="):   # sections (# partie, ## moment) et résumés (= …) de
+            i += 1                                             # Fountain : repères d'écriture, rien à tourner
             continue
         if re.match(r"^(INT|EXT|INT/EXT)[\. ]", s.upper()):
             nouvelle_scene(s)

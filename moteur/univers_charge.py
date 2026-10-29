@@ -30,3 +30,13 @@ def univers():
 
 def get(nom, defaut=None):
     return getattr(univers(), nom, defaut)
+
+def canon():
+    """Canon de l'univers pour la chaîne d'écriture (glossaire, règles des personnages, secrets, formule) :
+    attribut CANON de univers.py, sinon module canon.py du dossier de l'univers, sinon None (règles par défaut)."""
+    u = univers()
+    if getattr(u, "CANON", None) is not None:
+        return u.CANON
+    if os.path.exists(os.path.join(u.DOSSIER, "canon.py")):
+        return importlib.import_module("canon")
+    return None
