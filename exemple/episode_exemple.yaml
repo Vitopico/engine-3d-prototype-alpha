@@ -1,0 +1,41 @@
+# Fiche d'épisode de l'univers d'exemple (mini-épisode de 90 s, une épreuve).
+# Étapes : python moteur/ecrire.py squelette exemple/episode_exemple.yaml  →  écrire  →  python moteur/ecrire.py controler …
+episode: 1
+titre: "La glace de l'atelier"
+logline: "Robin veut faire fondre un glaçon pour arroser sa plante avant midi, mais il ne sait pas ce qui fait fondre la glace."
+public: "6-12 ans"
+scenario: "episode_exemple.fountain"
+
+objectifs:
+  - epreuve: 1
+    fait: "À la pression normale, l'eau gèle à 0 °C et la glace fond au-dessus de 0 °C."
+    source: "https://vitrinelinguistique.oqlf.gouv.qc.ca/fiche-gdt/fiche/26514052/echelle-de-temperature-celsius"
+    mot_nouveau: "degré"
+    phrase_cle: "Au-dessus de zéro degré, la glace fond."
+    solution: "poser le glaçon près de la lanterne chaude"
+heros_apprend: "La chaleur fait fondre la glace ; zéro degré est la frontière."
+heros_ressent: "Impatient → fier d'avoir trouvé seul"
+
+etat_depart:
+  competences: []
+  objets: [glaçon, plante]
+  sait: []
+etat_arrivee:
+  competences: [lire un thermomètre]
+  objets: [plante arrosée]
+  sait: ["la glace fond au-dessus de zéro degré"]
+
+moments:
+  - {id: b01, partie: ouverture, duree: 20, titre: "La plante a soif", lieu: "INT. ATELIER - MATIN", resume: "Robin trouve un glaçon et une plante sèche."}
+  - {id: b02, partie: epreuve1, duree: 50, titre: "Faire fondre", lieu: "INT. ATELIER - MATIN", resume: "Robin essaie, Plume explique, Robin trouve."}
+  - {id: b03, partie: fin, duree: 20, titre: "Midi", lieu: "INT. ATELIER - MIDI", resume: "La plante est arrosée."}
+
+poses_payes:
+  - {id: lanterne, quoi: "La lanterne allumée sur la table", pose: b01, paye: b02}
+
+mysteres: [EX-001]
+
+etapes:
+  concept: valide
+  recherche: valide
+  scenario: en_cours

@@ -122,7 +122,11 @@ def lire(path, noms_persos):
         txt, paires = notes_brutes(s)
         if not txt:                                 # ligne faite seulement de notes
             appliquer(paires, n)
-            ajoute(Element(type="note", texte="", ligne=n, notes=paires))
+            # comme tournage.py : une durée posée seule sous une action complète cette action
+            dern = doc["elements"][-1] if doc["elements"] else None
+            if dern is not None and dern["type"] == "action" and not any(k == "plan" for k, _ in paires):
+                dern["notes"] += [(k, v) for k, v in paires if k == "duree"]
+            ajoute(Element(type="note", texte="", ligne=n, notes=[(k, v) for k, v in paires if k != "duree"]))
             i += 1
             continue
         est_nom = txt == txt.upper() and re.search(r"[A-ZÀ-Ý]", txt) and not TRANSITION.match(txt)

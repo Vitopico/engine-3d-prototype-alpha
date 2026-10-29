@@ -1,0 +1,68 @@
+Title: La glace de l'atelier
+Credit:
+Fiche: episode_exemple.yaml
+Notes: Robin veut faire fondre un glaçon pour arroser sa plante avant midi, mais il ne sait pas ce qui fait fondre la glace.
+
+# Ouverture [[partie: ouverture]]
+= 20 s visées
+
+## La plante a soif [[beat: b01 | duree_visee: 20]]
+= Robin trouve un glaçon et une plante sèche.
+
+INT. ATELIER - MATIN
+
+La lanterne allumée sur la table [[pose: lanterne]]
+
+[[a_ecrire: Robin trouve un glaçon et une plante sèche.]]
+
+# Épreuve [[partie: epreuve1]]
+= 50 s visées
+
+## Faire fondre [[beat: b02 | duree_visee: 50]]
+= Robin essaie, Plume explique, Robin trouve.
+
+INT. ATELIER - MATIN
+
+[[lecon: decouverte | epreuve: 1]]
+
+Robin essaie quelque chose de naïf. Ça rate. [[a_ecrire: l'essai naïf]]
+
+ROBIN
+(perplexe, vers l'enfant)
+Et toi, tu sais pourquoi ? [[regard: camera]]
+
+Un temps pour deviner. [[duree: 3]]
+
+[[lecon: explication | epreuve: 1]]
+
+[[source: https://vitrinelinguistique.oqlf.gouv.qc.ca/fiche-gdt/fiche/26514052/echelle-de-temperature-celsius]]
+[[mot_nouveau: degré]]
+[[phrase_cle: Au-dessus de zéro degré, la glace fond.]]
+
+PLUME
+[[a_ecrire: comparaison du quotidien, schéma, le mot nouveau dit trois fois]]
+Au-dessus de zéro degré, la glace fond.
+
+[[lecon: reformulation | epreuve: 1]]
+
+PLUME
+[[a_ecrire: quelques mots, jamais la solution]]
+…
+
+[[lecon: reussite | epreuve: 1]]
+
+Robin essaie seul : presque. [[a_ecrire: essai imparfait]]
+
+Robin corrige et réussit. [[a_ecrire: la réussite]] [[solution: poser le glaçon près de la lanterne chaude]]
+
+La lanterne allumée sur la table sert enfin. [[paye: lanterne]]
+
+# Fin [[partie: fin]]
+= 20 s visées
+
+## Midi [[beat: b03 | duree_visee: 20]]
+= La plante est arrosée.
+
+INT. ATELIER - MIDI
+
+[[a_ecrire: La plante est arrosée.]]

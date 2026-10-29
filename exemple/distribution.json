@@ -2,9 +2,20 @@
   "note": "Distribution de l'univers d'exemple : nom dans le scénario (Fountain) → identifiant, voix inventée par description (Qwen3-TTS VoiceDesign), graine, couleur des sous-titres. Aucune voix de personne réelle.",
   "personnages": {
     "robin": {
-      "noms": ["ROBIN"],
+      "noms": [
+        "ROBIN"
+      ],
       "voix": "A friendly young adult storyteller, warm and clear voice, calm and curious, very clear French articulation, standard French accent.",
-      "graine": 7, "couleur": "#ffe2a8"
+      "graine": 7,
+      "couleur": "#ffe2a8"
+    },
+    "plume": {
+      "noms": [
+        "PLUME"
+      ],
+      "voix": "A small lively talking notebook, bright and kind voice, quick but very clear French articulation, standard French accent.",
+      "graine": 8,
+      "couleur": "#c8f0ff"
     }
   }
 }
