@@ -26,6 +26,7 @@ and video. Characters and sets live in a separate "universe" folder, which can s
 | Son | `moteur/son3d.py` | Bruitages placés d'après les événements, panoramique, réverbération du lieu, voix devant, −16 LUFS |
 | Musique | `moteur/musique.py` | Composition MIDI originale à partir d'un motif, jouée par FluidSynth |
 | Montage, contrôle | `moteur/assembler.py`, `moteur/qc_video.py` | Vidéo 1280×720, planche contact, contrôle (formats, volume, images figées, flashs) |
+| Contrôle visuel | `moteur/qc_visuel.py` | Plans détectés, images noires/vides, sauts, images parasites, scintillement, flou, contraste, personnage coupé (avec masque) ; planches contact numérotées ; rapport « vérifié par mesure » / « à regarder par un humain » |
 
 ## Écrire un épisode : la chaîne d'écriture
 
