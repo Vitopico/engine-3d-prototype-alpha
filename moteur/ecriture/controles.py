@@ -323,7 +323,7 @@ def controle_lecon(doc, canon, B, fiche, R):
 
 def controle_pedagogie(doc, canon, B, fiche, R):
     for o in (fiche or {}).get("objectifs", []):
-        if isinstance(o, dict) and not str(o.get("source", "")).startswith("http"):
+        if isinstance(o, dict) and not re.match(r"^https?://\S+\.\S+", str(o.get("source", ""))):
             R.ajoute(1, "bloquant", "Pédagogie", f"Fait sans source (épreuve {o.get('epreuve', '?')})",
                      "Chaque fait enseigné a une source vérifiée (URL) dans la fiche.", o.get("fait", ""))
     for v, el in S.toutes(doc, "source"):
@@ -434,6 +434,10 @@ def controle_savoir(doc, canon, fiche, R):
         for x in doc["elements"]:
             if x["ligne"] >= el["ligne"]:
                 break
+            # le moment où il apprend (même beat, ou même étape de leçon) n'est pas « avant »
+            if (x.get("epreuve"), x.get("lecon")) == (el.get("epreuve"), el["lecon"]) if el.get("lecon") \
+                    else el.get("beat") and x.get("beat") == el["beat"]:
+                continue
             if x["type"] == "replique" and x["qui"] == qui.lower():
                 commun = cles & cles_sens(x["texte"])
                 if len(commun) >= max(2, (len(cles) + 1) // 2):

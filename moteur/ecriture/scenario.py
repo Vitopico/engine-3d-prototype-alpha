@@ -38,7 +38,7 @@ def mots(s):
 
 def phrases(s):
     """Découpe un texte en phrases (sur . ! ? …), sans les morceaux vides."""
-    return [p.strip() for p in re.split(r"(?<=[\.!?…])\s+|[\.!?…]+$", s) if p and mots(p)]
+    return [p.strip() for p in re.split(r"(?<=[\.!?…])\s+", s) if p and mots(p)]
 
 
 def notes_brutes(txt):

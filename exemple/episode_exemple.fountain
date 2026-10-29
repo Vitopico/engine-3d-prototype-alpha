@@ -1,5 +1,5 @@
 Title: La glace de l'atelier
-Credit:
+Credit: Engine 3D Prototype (Alpha) — exemple de la chaîne d'écriture
 Fiche: episode_exemple.yaml
 Notes: Robin veut faire fondre un glaçon pour arroser sa plante avant midi, mais il ne sait pas ce qui fait fondre la glace.
 
@@ -11,9 +11,25 @@ Notes: Robin veut faire fondre un glaçon pour arroser sa plante avant midi, mai
 
 INT. ATELIER - MATIN
 
-La lanterne allumée sur la table [[pose: lanterne]]
+[[lieu: atelier | acteurs: robin=mannequin]]
 
-[[a_ecrire: Robin trouve un glaçon et une plante sèche.]]
+[[plan: 1.1 | cadrage: plan_large | sujet: robin | camera: fixe]]
+
+Sur la table, la Lanterne est allumée. À côté, une plante toute sèche. [[pose: lanterne | duree: 3]]
+
+Robin entre, un gros glaçon dans les mains. [[geste: marche | duree: 2.5]]
+
+ROBIN
+(inquiet)
+Oh non, ma plante a soif ! Il me faut de l'eau avant midi.
+
+PLUME
+(vif)
+Tu tiens de l'eau dans tes mains.
+
+ROBIN
+(perplexe)
+Ça ? C'est de la glace. C'est dur comme un caillou.
 
 # Épreuve [[partie: epreuve1]]
 = 50 s visées
@@ -21,15 +37,13 @@ La lanterne allumée sur la table [[pose: lanterne]]
 ## Faire fondre [[beat: b02 | duree_visee: 50]]
 = Robin essaie, Plume explique, Robin trouve.
 
-INT. ATELIER - MATIN
-
 [[lecon: decouverte | epreuve: 1]]
 
-Robin essaie quelque chose de naïf. Ça rate. [[a_ecrire: l'essai naïf]]
+Robin secoue le glaçon très fort. Rien ne coule. [[duree: 2.5]]
 
 ROBIN
 (perplexe, vers l'enfant)
-Et toi, tu sais pourquoi ? [[regard: camera]]
+Il ne fond pas. Et toi, tu sais pourquoi ? [[regard: camera]]
 
 Un temps pour deviner. [[duree: 3]]
 
@@ -40,22 +54,38 @@ Un temps pour deviner. [[duree: 3]]
 [[phrase_cle: Au-dessus de zéro degré, la glace fond.]]
 
 PLUME
-[[a_ecrire: comparaison du quotidien, schéma, le mot nouveau dit trois fois]]
+(patient)
+Pense à une glace à la vanille en été. Elle coule, parce qu'il fait chaud.
+[[craie: fleche]]
+
+PLUME
+On mesure le chaud et le froid en degrés. À zéro degré, l'eau devient glace.
+
+PLUME
+(lentement)
 Au-dessus de zéro degré, la glace fond.
 
 [[lecon: reformulation | epreuve: 1]]
 
 PLUME
-[[a_ecrire: quelques mots, jamais la solution]]
-…
+Il lui faut du chaud.
 
 [[lecon: reussite | epreuve: 1]]
 
-Robin essaie seul : presque. [[a_ecrire: essai imparfait]]
+Robin souffle sur le glaçon. Une goutte, puis plus rien. [[duree: 2.5]]
 
-Robin corrige et réussit. [[a_ecrire: la réussite]] [[solution: poser le glaçon près de la lanterne chaude]]
+ROBIN
+Mon souffle, c'est trop peu. Où est-ce qu'il fait chaud ici ?
 
-La lanterne allumée sur la table sert enfin. [[paye: lanterne]]
+Robin regarde autour de lui et voit la Lanterne. Il pose le glaçon dans une coupelle, tout près. [[paye: lanterne | duree: 3]]
+
+Le glaçon fond. L'eau coule dans la coupelle. [[duree: 3]]
+
+ROBIN
+(fier)
+Il fait plus de zéro degré près de la Lanterne. Ça fond !
+
+[[apprend: robin | la glace fond au-dessus de zéro degré]]
 
 # Fin [[partie: fin]]
 = 20 s visées
@@ -65,4 +95,20 @@ La lanterne allumée sur la table sert enfin. [[paye: lanterne]]
 
 INT. ATELIER - MIDI
 
-[[a_ecrire: La plante est arrosée.]]
+Robin verse l'eau de la coupelle sur la plante. Les feuilles se redressent doucement. [[duree: 5]]
+
+ROBIN
+(heureux)
+Voilà ma plante. Elle a bu juste avant midi.
+
+PLUME
+Et tu as trouvé tout seul. Bravo, Robin !
+
+ROBIN
+(il rit)
+Demain, je mets la plante au soleil.
+
+ROBIN
+(plein d'élan)
+Au travail !
+[[geste: saut_joie | regard: camera | son: boing]]

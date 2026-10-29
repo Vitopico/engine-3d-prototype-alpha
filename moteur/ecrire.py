@@ -62,7 +62,8 @@ def main():
         for k, v in canon.PERSONNAGES.items():
             regles = [f"{x} {v[x]}" for x in ("mots_max_phrase", "etape_lecon") if v.get(x)]
             regles += ["ne résout pas"] * bool(v.get("ne_resout_pas")) + ["héros"] * bool(v.get("heros"))
-            regles += [f"{len(v['interdits'])} interdits"] * bool(v.get("interdits"))
+            if v.get("interdits"):
+                regles.append(f"{len(v['interdits'])} interdits")
             print(f"  {k} : " + (", ".join(regles) or "aucune règle"))
         print("Secrets :", ", ".join(s["id"] for s in canon.SECRETS) or "(aucun)")
         print("Formule :", " + ".join(f"{p['id']} {p['duree']} s" for p in canon.FORMULE),

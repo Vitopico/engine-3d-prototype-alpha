@@ -15,6 +15,7 @@ and video. Characters and sets live in a separate "universe" folder, which can s
 
 | Étape | Module | Ce qui est fait |
 |---|---|---|
+| Écriture | `moteur/ecrire.py`, `moteur/ecriture/` | Fiche d'épisode, squelette du scénario, contrôles (canon, personnages, durées, leçon), tableau de bord |
 | Script | `moteur/tournage.py` | Lit un scénario Fountain annoté `[[plan: … \| cadrage: … \| geste: … \| regard: … \| son: …]]` ; (parenthèse) = émotion de la voix |
 | Voix | `outils/voix/` | Voix inventées par description (Qwen3-TTS), contrôle d'intelligibilité par Whisper |
 | Minutage, bouches | `moteur/tournage.py` | Durées réelles des voix, formes de bouche image par image (Rhubarb Lip Sync), bruits de pas automatiques |
@@ -25,6 +26,29 @@ and video. Characters and sets live in a separate "universe" folder, which can s
 | Son | `moteur/son3d.py` | Bruitages placés d'après les événements, panoramique, réverbération du lieu, voix devant, −16 LUFS |
 | Musique | `moteur/musique.py` | Composition MIDI originale à partir d'un motif, jouée par FluidSynth |
 | Montage, contrôle | `moteur/assembler.py`, `moteur/qc_video.py` | Vidéo 1280×720, planche contact, contrôle (formats, volume, images figées, flashs) |
+
+## Écrire un épisode : la chaîne d'écriture
+
+`moteur/ecrire.py` aide à écrire avant de tourner : une **fiche d'épisode** (YAML) → un **scénario Fountain** → des
+**contrôles automatiques** → un **rapport** (Markdown) et un **tableau de bord** HTML autonome.
+
+1. `ecrire.py fiche ep.yaml` crée une fiche vierge d'après la formule de l'univers ; on y écrit la logline, le fait enseigné
+   et sa source, les moments (partie de la formule, durée visée), ce qui est posé puis payé, les étapes de production.
+2. `ecrire.py squelette ep.yaml` écrit le scénario de départ : une section `# Partie [[partie: …]]` par partie, un
+   `## Moment [[beat: …]]` par moment, la boucle de leçon déjà posée, des `[[a_ecrire: …]]` à remplacer.
+3. On écrit. Notes en plus (ignorées par `tournage.py`) : `[[lecon: decouverte|explication|reformulation|reussite | epreuve: 1]]`,
+   `[[source: url]]`, `[[phrase_cle: …]]`, `[[mot_nouveau: …]]`, `[[pose: id]]`, `[[paye: id]]`, `[[apprend: qui | fait]]`.
+4. `ecrire.py controler ep.fountain` : canon (noms, secrets), règles des personnages, durées de la formule, boucle de leçon,
+   sources, langage, posé/payé, savoir des personnages ; chaque problème a sa ligne et sa gravité (bloquant, à revoir, conseil).
+5. Le canon (glossaire, personnages, secrets, formule) vient de l'univers : `canon.py` à côté de `univers.py`
+   (modèle : `exemple/canon.py` ; interface : `moteur/ecriture/canon_defaut.py`).
+
+```
+UNIVERS=exemple python3 moteur/ecrire.py controler exemple/episode_exemple.fountain
+# → exemple/episode_exemple.controle.md et .controle.html ; code de sortie 1 s'il reste un point bloquant
+```
+
+Les contrôles sont des heuristiques : ils aident à relire, ils ne jugent ni l'émotion ni l'exactitude d'un fait.
 
 ## L'univers : personnages et décors à part
 
