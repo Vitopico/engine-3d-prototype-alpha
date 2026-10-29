@@ -31,7 +31,9 @@ def hz(m):
 class Chanteur:
     def __init__(self, voix="F2", vitesse=0.9):
         import supertonic
-        self.tts = supertonic.TTS(model="supertonic-3", auto_download=True)
+        import os
+        d = os.environ.get("SUPERTONIC_DIR")      # modèle déjà téléchargé (sinon : téléchargement automatique)
+        self.tts = supertonic.TTS(model="supertonic-3", model_dir=d, auto_download=d is None)
         self.style = self.tts.get_voice_style(voix)
         self.vitesse = vitesse
         self.cache = {}
