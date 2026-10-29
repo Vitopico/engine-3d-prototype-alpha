@@ -331,3 +331,40 @@ class Jeu:
                 k = ease_retour(v) if self.amorti else v * v * (3 - 2 * v)
                 return p1, p0, k
         return c[-1][1], c[-1][1], 1.0
+
+# ---------------------------------------------------------------- clips de capture de mouvement (mocap3d.py)
+class Clip:
+    """Rejoue un clip de mouvement capturé (JSON de mocap3d.recibler) : pose des os et déplacement du bassin à
+    l'instant t (boucle possible), avec un léger lissage entre deux images. Se mélange avec une pose par Rig.apply."""
+    def __init__(self, chemin_ou_dict, boucle=False, vitesse=1.0, amplitude=1.0):
+        import json
+        self.d = json.load(open(chemin_ou_dict)) if isinstance(chemin_ou_dict, str) else chemin_ou_dict
+        self.fps = self.d["fps"]
+        self.n = len(self.d["images"])
+        self.duree = self.n / self.fps
+        self.boucle, self.vitesse, self.amp = boucle, vitesse, amplitude
+
+    def _i(self, t):
+        u = max(0.0, t * self.vitesse) * self.fps
+        if self.boucle:
+            u = u % (self.n - 1)
+        u = min(u, self.n - 1.001)
+        a = int(u)
+        return a, u - a
+
+    def pose(self, t):
+        a, w = self._i(t)
+        A, B = self.d["images"][a], self.d["images"][min(a + 1, self.n - 1)]
+        out = {}
+        for k in A:
+            out[k] = tuple((x * (1 - w) + y * w) * self.amp for x, y in zip(A[k], B.get(k, A[k])))
+        r0, r1 = self.d["racine"][a], self.d["racine"][min(a + 1, self.n - 1)]
+        r = [x * (1 - w) + y * w for x, y in zip(r0, r1)]
+        out["_haut"] = r[2]
+        return out
+
+    def racine(self, t):
+        """(dx, dy, dz, cap en degrés) depuis le début du clip, repère du personnage au départ."""
+        a, w = self._i(t)
+        r0, r1 = self.d["racine"][a], self.d["racine"][min(a + 1, self.n - 1)]
+        return [x * (1 - w) + y * w for x, y in zip(r0, r1)]

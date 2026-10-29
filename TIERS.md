@@ -14,5 +14,8 @@ Le moteur ne contient aucune ressource de tiers : il les télécharge à l'usage
 | FluidSynth | Lecture des morceaux MIDI | LGPL-2.1-or-later | https://www.fluidsynth.org |
 | FluidR3_GM | Sons d'instruments | MIT | paquet Debian/Ubuntu fluid-soundfont-gm |
 | ffmpeg | Montage, son, contrôle qualité | LGPL/GPL | https://ffmpeg.org |
+| Supertonic 3 (Supertone) | Voix parlée ; base de la voix chantée (`outils/chant/`) | Code MIT ; modèle OpenRAIL-M (restrictions d'usage) | https://github.com/supertone-inc/supertonic |
+| WORLD (M. Morise) via pyworld | Hauteur et durée des notes chantées | BSD modifiée (WORLD) ; MIT (pyworld) | https://github.com/mmorise/World |
+| CMU Graphics Lab Motion Capture Database (conversion BVH de B. Hahne) | Mouvements capturés reciblés par `moteur/mocap3d.py` | « Libre pour tout usage », y compris dans des produits vendus ; interdit de revendre les données, même converties : jamais dans ce dépôt public | http://mocap.cs.cmu.edu |
 
 Voix générées par IA : à signaler lors de la publication d'une vidéo.
