@@ -240,8 +240,13 @@ def regler(nom, direction=None, couleur=None, force=None, position=None, rayon=N
     if rayon is not None:
         nt.nodes[f"{nom}_rayon"].outputs[0].default_value = rayon
 
-def regler_bruit(force=None, echelle=None):
+def regler_bruit(force=None, echelle=None, detail=None):
+    """Bruit de pinceau : force du décalage des paliers, échelle, détail (octaves : le poste le plus coûteux du
+    shader ; 0 ou 1 suffit en animation)."""
     nt = _G["g"]
+    if detail is not None:
+        nt.nodes["bruit_pinceau"].inputs["Detail"].default_value = detail
+        nt.nodes["trainees"].inputs["Detail"].default_value = max(detail - 1, 0)
     if force is not None:
         nt.nodes["bruit_force"].outputs[0].default_value = force
     if echelle is not None:
@@ -407,7 +412,22 @@ def indexer(objets=None, fondus=None):
     for o, ref in (fondus or {}).items():
         o.pass_index = ref.pass_index
 
-def contour_compo(nt, rl, couleur="#2a1c2c", seuil_prof=0.035, opacite=0.9, seuil_normale=None, indice=True):
+def _seuil_doux(nt, x, s):
+    """Seuil adouci (0 sous 0,6 s, 1 au-dessus de 1,4 s) : un trait qui s'estompe au lieu de sauter d'un pixel."""
+    return _cmath(nt, "MULTIPLY", _cmath(nt, "SUBTRACT", x, 0.6 * s), 1.0 / (0.8 * s), clamp=True)
+
+def _smaa(nt, src):
+    """Anticrénelage morphologique (SMAA) du masque de trait."""
+    aa = _cn(nt, "CompositorNodeAntiAliasing")
+    for k, v in (("Threshold", 0.05), ("Contrast Limit", 2.0), ("Corner Rounding", 0.25)):
+        if k in aa.inputs:
+            aa.inputs[k].default_value = v
+    nt.links.new(src, aa.inputs["Image"])
+    bw = _cn(nt, "CompositorNodeRGBToBW")
+    nt.links.new(aa.outputs[0], bw.inputs[0])
+    return bw.outputs[0]
+
+def contour_compo(nt, rl, couleur="#2a1c2c", seuil_prof=0.035, opacite=0.9, seuil_normale=None, indice=True, lisse=True):
     """Trait de contour au compositing : Sobel sur l'alpha (silhouette), sur l'indice d'objet (bord entre deux pièces)
     et sur le logarithme de la profondeur (un volume devant un autre). La normale (AOV « normale ») est en option :
     à basse résolution, elle remplit de trait les petites formes très courbes (nez, doigts).
@@ -421,7 +441,7 @@ def contour_compo(nt, rl, couleur="#2a1c2c", seuil_prof=0.035, opacite=0.9, seui
     if indice and "IndexOB" in rl.outputs:
         si = _cn(nt, "CompositorNodeRGBToBW")
         nt.links.new(sobel(rl.outputs["IndexOB"]), si.inputs[0])
-        interieur = _cmath(nt, "GREATER_THAN", si.outputs[0], 0.5)
+        interieur = _seuil_doux(nt, si.outputs[0], 0.5) if lisse else _cmath(nt, "GREATER_THAN", si.outputs[0], 0.5)
     if seuil_normale is not None and "normale" in rl.outputs:
         sn = _cn(nt, "CompositorNodeRGBToBW")
         nt.links.new(sobel(rl.outputs["normale"]), sn.inputs[0])
@@ -431,10 +451,13 @@ def contour_compo(nt, rl, couleur="#2a1c2c", seuil_prof=0.035, opacite=0.9, seui
     lz = _cmath(nt, "LOGARITHM", z, 2.718281828)
     sz = _cn(nt, "CompositorNodeRGBToBW")
     nt.links.new(sobel(lz), sz.inputs[0])
-    mz = _cmath(nt, "GREATER_THAN", sz.outputs[0], seuil_prof)
+    mz = _seuil_doux(nt, sz.outputs[0], seuil_prof) if lisse else _cmath(nt, "GREATER_THAN", sz.outputs[0], seuil_prof)
     interieur = mz if interieur is None else _cmath(nt, "MAXIMUM", interieur, mz)
     interieur = _cmath(nt, "MULTIPLY", interieur, rl.outputs["Alpha"])
-    m = _cmath(nt, "MULTIPLY", _cmath(nt, "MAXIMUM", sa, interieur), opacite, clamp=True)
+    m = _cmath(nt, "MAXIMUM", sa, interieur)
+    if lisse:
+        m = _smaa(nt, m)
+    m = _cmath(nt, "MULTIPLY", m, opacite, clamp=True)
     rgb = _cn(nt, "CompositorNodeRGB")
     rgb.outputs[0].default_value = (*lin(couleur), 1)
     sa_n = _cn(nt, "CompositorNodeSetAlpha", mode="REPLACE_ALPHA")
