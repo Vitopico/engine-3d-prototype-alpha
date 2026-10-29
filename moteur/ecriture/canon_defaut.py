@@ -15,6 +15,11 @@ univers.py. Chaque nom absent du canon de l'univers prend la valeur définie ici
                          heros              True : le personnage qui découvre et réussit
                          phrases            phrases récurrentes, forme officielle
                          interdits          [(motif regex, explication)] : ce que ce personnage ne dit jamais
+  REPLIQUES_SURVEILLEES  répliques à doser ou retirées : [{texte, regle, …}] ; regle « rare » (alerte si déjà dite
+                       dans l'un des « fenetre » épisodes précédents, ou plus de « max_par_episode » fois dans l'épisode)
+                       ou « retiree » (alerte à chaque occurrence) ; options : gravite, explication, qui (ids)
+  EPISODES             {numéro: chemin du scénario (relatif au dossier du canon)} : sert à retrouver les épisodes
+                       précédents ; le numéro de l'épisode contrôlé vient de la fiche (« episode ») ou de l'en-tête
   SECRETS              [{id, motifs_partout: [(regex, explication)]}] : jamais dans une réplique
   FORMULE              parties de l'épisode, dans l'ordre : {id, nom, duree (s), epreuve (n° ou absent)}
   TOLERANCE_TOTALE     écart permis sur la durée totale (0.10 = ± 10 %)
@@ -34,6 +39,8 @@ MOTS_COMMUNS_AUSSI = []
 FORMES_FAUTIVES = {}
 PERSONNAGES = {}
 SECRETS = []
+REPLIQUES_SURVEILLEES = []
+EPISODES = {}
 
 # Formule neutre d'un épisode éducatif de 9 minutes (540 s)
 FORMULE = [
@@ -75,7 +82,7 @@ ETAPES = [
 STATUTS = {"a_faire": "À faire", "en_cours": "En cours", "a_valider": "À valider", "valide": "Validé"}
 REGLES = []
 
-NOMS = ["GLOSSAIRE", "MOTS_COMMUNS_AUSSI", "FORMES_FAUTIVES", "PERSONNAGES", "SECRETS", "FORMULE", "TOLERANCE_TOTALE",
+NOMS = ["GLOSSAIRE", "MOTS_COMMUNS_AUSSI", "FORMES_FAUTIVES", "PERSONNAGES", "SECRETS", "REPLIQUES_SURVEILLEES", "EPISODES", "FORMULE", "TOLERANCE_TOTALE",
         "BOUCLE_LECON", "NOMS_ETAPES_LECON", "DEBIT_MOTS_S", "MOTS_MAX_PHRASE", "MOTS_MAX_PHRASE_CLE",
         "REPETITIONS_MOT_NOUVEAU", "MOTS_RARES", "ETAPES", "STATUTS", "REGLES"]
 

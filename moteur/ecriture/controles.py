@@ -6,7 +6,7 @@
 Les contrôles sont des heuristiques : ils aident à relire, ils ne remplacent pas la lecture.
 Engine 3D Prototype (Alpha) — GPL-3.0-or-later.
 """
-import difflib, re
+import difflib, os, re
 from . import scenario as S
 
 GRAVITES = ["bloquant", "a_revoir", "conseil"]
@@ -171,6 +171,73 @@ def controle_personnages(doc, canon, R):
             grav = min((g for g, _ in touches), key=GRAVITES.index)
             expl = " ".join(dict.fromkeys(e for g, e in touches if g == grav))
             R.ajoute(ligne, grav, "Personnages", f"{el['nom']} ne dit pas cela", expl, el["texte"])
+
+
+# ---------------------------------------------------------------- 2 bis. répliques rares ou retirées (canon de l'univers)
+def _occurrences(doc, phrase, qui=None):
+    """Répliques du scénario qui contiennent la phrase (comparaison sans accents, ponctuation ni casse)."""
+    motif = re.compile(r"(?:^|\s)" + re.escape(S.norm(phrase)) + r"(?:\s|$)")
+    return [el for el in doc["elements"] if el["type"] == "replique" and (not qui or el["qui"] in qui)
+            and motif.search(S.norm(el["texte"]))]
+
+
+def numero_episode(doc, fiche):
+    for v in ((fiche or {}).get("episode"), doc["entete"].get("Episode"), doc["entete"].get("Épisode")):
+        try:
+            return int(str(v).strip())
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def controle_repliques(doc, canon, noms_persos, fiche, R):
+    regles = getattr(canon, "REPLIQUES_SURVEILLEES", None) or []
+    if not regles:
+        return {}
+    num = numero_episode(doc, fiche)
+    base = os.path.dirname(canon.source) if canon.source else os.getcwd()
+    precedents, absents = {}, []
+    fen = max((r.get("fenetre", 6) for r in regles if r.get("regle") == "rare"), default=0)
+    if num is not None:
+        for k in range(max(1, num - fen), num):
+            chemin = (canon.EPISODES or {}).get(k) or (canon.EPISODES or {}).get(str(k))
+            p = os.path.normpath(os.path.join(base, chemin)) if chemin else None
+            if p and os.path.exists(p) and os.path.abspath(p) != os.path.abspath(doc["chemin"]):
+                precedents[k] = S.lire(p, noms_persos)
+            else:
+                absents.append(k)
+    mesures = {"episode": num, "precedents_lus": sorted(precedents), "precedents_absents": absents, "regles": []}
+    for r in regles:
+        txt, qui = r["texte"], r.get("qui")
+        occ = _occurrences(doc, txt, qui)
+        grav = r.get("gravite", "a_revoir")
+        info = {"texte": txt, "regle": r.get("regle"), "occurrences": len(occ)}
+        if r.get("regle") == "retiree":
+            for el in occ:
+                R.ajoute(el.get("ligne_texte", el["ligne"]), grav, "Répliques", f"Réplique retirée : « {txt} »",
+                         r.get("explication", "Cette réplique ne s'emploie plus (décision de l'auteur)."), el["texte"])
+        elif r.get("regle") == "rare":
+            mx, f = r.get("max_par_episode", 1), r.get("fenetre", 6)
+            for el in occ[mx:]:
+                R.ajoute(el.get("ligne_texte", el["ligne"]), grav, "Répliques",
+                         f"Réplique rare dite {len(occ)} fois dans l'épisode : « {txt} »",
+                         r.get("explication", "") + f" Au plus {mx} fois par épisode.", el["texte"])
+            deja = [k for k, d in precedents.items() if num - k <= f and _occurrences(d, txt, qui)]
+            info["deja_dans"] = deja
+            if occ and deja:
+                R.ajoute(occ[0].get("ligne_texte", occ[0]["ligne"]), grav, "Répliques",
+                         f"Réplique rare déjà dite dans l'épisode {', '.join(map(str, deja))} : « {txt} »",
+                         r.get("explication", "") + f" Pas plus d'une fois sur {f + 1} épisodes de suite.", occ[0]["texte"])
+            if occ and num is None:
+                R.ajoute(occ[0].get("ligne_texte", occ[0]["ligne"]), "conseil", "Répliques",
+                         f"Réplique rare « {txt} » : épisodes précédents non vérifiés",
+                         "Numéro d'épisode inconnu (champ « episode » de la fiche ou « Episode: » en en-tête).", occ[0]["texte"])
+            elif occ and absents:
+                R.ajoute(occ[0].get("ligne_texte", occ[0]["ligne"]), "conseil", "Répliques",
+                         f"Réplique rare « {txt} » : épisode(s) {', '.join(map(str, absents))} introuvable(s)",
+                         "Ajouter leur scénario dans EPISODES du canon pour que la vérification soit complète.", occ[0]["texte"])
+        mesures["regles"].append(info)
+    return mesures
 
 
 # ---------------------------------------------------------------- 3. formule : durées
@@ -463,6 +530,7 @@ def tout(doc, canon, noms_persos, fiche=None):
     R = Rapport()
     controle_canon(doc, canon, noms_persos, R)
     controle_personnages(doc, canon, R)
+    Q = controle_repliques(doc, canon, noms_persos, fiche, R)
     D = durees(doc, canon)
     controle_formule(doc, canon, D, R)
     B = boucles(doc, canon)
@@ -474,4 +542,4 @@ def tout(doc, canon, noms_persos, fiche=None):
     controle_savoir(doc, canon, fiche, R)
     controle_fiche(doc, fiche, D, R)
     R.problemes.sort(key=lambda p: (GRAVITES.index(p["gravite"]), p["ligne"]))
-    return R.problemes, {"durees": D, "boucles": B, "aide": aide, "langage": L, "poses": P}
+    return R.problemes, {"durees": D, "boucles": B, "aide": aide, "langage": L, "poses": P, "repliques": Q}
