@@ -167,6 +167,8 @@ def duree_wav(path):
 def syllabes(t):
     return max(1, len(re.findall(r"[aeiouyàâéèêëîïôûùü]+", t.lower())))
 
+COUPEES = {}
+
 def couper_voix(src, dst, seuil=0.02):
     """Retire les silences de début et de fin d'une voix (garde 40 ms avant, 120 ms après)."""
     sys.path.insert(0, ICI)
@@ -174,8 +176,10 @@ def couper_voix(src, dst, seuil=0.02):
     from scipy.io import wavfile
     w = son3d.charge(src, 48000)
     idx = np.where(np.abs(w) > seuil * max(np.abs(w).max(), 1e-6))[0]
+    debut = max(idx[0] - 1920, 0) if len(idx) else 0
     if len(idx):
-        w = w[max(idx[0] - 1920, 0): min(idx[-1] + 5760, len(w))]
+        w = w[debut: min(idx[-1] + 5760, len(w))]
+    COUPEES[os.path.abspath(dst)] = (src, debut / 48000.0)   # pour caler l'alignement de la voix d'origine
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     wavfile.write(dst, 48000, w.astype(np.float32))
     return dst
@@ -187,8 +191,15 @@ RHUBARB = os.environ.get("RHUBARB") or shutil.which("rhubarb") or "rhubarb"
 RH_VIS = {"A": "ferme", "X": "ferme", "B": "ouv1", "G": "ouv1", "C": "ouv2", "H": "ouv2", "D": "ouv3", "E": "o", "F": "o"}
 
 def visemes(wav, fps, t0):
-    """Visèmes image par image. Rhubarb Lip Sync (MIT, reconnaissance phonétique indépendante de la langue) s'il est
-    installé, sinon la méthode simple de son3d (énergie et timbre)."""
+    """Visèmes image par image. D'abord un alignement phonème par phonème posé à côté de la voix
+    (<voix>.wav.alignement.json, alignements/<voix>.json ou <voix>.TextGrid : Montreal Forced Aligner, voir levres.py),
+    sinon Rhubarb Lip Sync (MIT, reconnaissance phonétique indépendante de la langue) s'il est installé, sinon la méthode
+    simple de son3d (énergie et timbre)."""
+    import levres
+    src, decalage = COUPEES.get(os.path.abspath(wav), (wav, 0.0))
+    v = levres.visemes_pour_wav(src, fps, decalage=decalage)
+    if v is not None:
+        return v
     if os.path.exists(RHUBARB):
         out = wav + ".rhubarb.json"
         r = subprocess.run([RHUBARB, "-r", "phonetic", "-f", "json", "--extendedShapes", "GHX", "-q", wav, "-o", out],

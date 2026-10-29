@@ -18,7 +18,7 @@ and video. Characters and sets live in a separate "universe" folder, which can s
 | Écriture | `moteur/ecrire.py`, `moteur/ecriture/` | Fiche d'épisode, squelette du scénario, contrôles (canon, personnages, durées, leçon), tableau de bord |
 | Script | `moteur/tournage.py` | Lit un scénario Fountain annoté `[[plan: … \| cadrage: … \| geste: … \| regard: … \| son: …]]` ; (parenthèse) = émotion de la voix |
 | Voix | `outils/voix/` | Voix inventées par description (Qwen3-TTS), contrôle d'intelligibilité par Whisper |
-| Minutage, bouches | `moteur/tournage.py` | Durées réelles des voix, formes de bouche image par image (Rhubarb Lip Sync), bruits de pas automatiques |
+| Minutage, bouches | `moteur/tournage.py`, `moteur/levres.py` | Durées réelles des voix ; formes de bouche image par image d'après un alignement phonème par phonème (Montreal Forced Aligner), avec coarticulation et lissage, sinon Rhubarb Lip Sync ; bruits de pas automatiques |
 | Jeu d'acteur | `moteur/rig3d.py`, `moteur/acteurs3d.py` | Squelette, bibliothèque de poses, anticipation et amorti, marche aux pieds plantés, regard, clignements, respiration |
 | Caméra | `moteur/tournage_rendu.py` | Cadrages écrits (plan large, plan moyen, gros plan, plongée…), mouvements (avancée lente, orbite, secousse…), coup gelé, ralenti, traits de craie lumineuse pour les moments explicatifs |
 | Décor | `moteur/decor3d.py` | Matières photoréalistes, ciels HDRI, modèles, dispersion, poussières, brume lumineuse |

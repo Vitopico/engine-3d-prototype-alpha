@@ -7,6 +7,8 @@ Le moteur ne contient aucune ressource de tiers : il les télécharge à l'usage
 | Blender 4.5 LTS | Modélisation, animation, rendu (Cycles) | GPL-2.0-or-later (les images rendues appartiennent à leur auteur) | https://www.blender.org |
 | Poly Haven | Ciels HDRI, textures, modèles 3D | CC0 (domaine public) | https://polyhaven.com |
 | Kenney | Bruitages | CC0 (domaine public) | https://kenney.nl |
+| Montreal Forced Aligner 3.4 (M. McAuliffe, M. Socolof, S. Mihuc, M. Wagner, M. Sonderegger, 2017) | Alignement phonème par phonème des voix, lu par `moteur/levres.py` (lancé hors du moteur, ex. GitHub Actions) | MIT | https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner |
+| Modèle acoustique, dictionnaire et G2P « french_mfa » v3.0.0 (M. McAuliffe, M. Sonderegger, 2024) | Phonèmes du français pour l'alignement ; non inclus dans ce dépôt | **CC BY 4.0** : crédit obligatoire (« French MFA acoustic model v3.0.0 » et « French MFA dictionary v3.0.0 », McAuliffe & Sonderegger, 2024, https://mfa-models.readthedocs.io) dans les crédits d'une œuvre qui s'en sert | https://github.com/MontrealCorpusTools/mfa-models |
 | Rhubarb Lip Sync 1.14 | Formes de bouche d'après la voix | MIT | https://github.com/DanielSWolf/rhubarb-lip-sync |
 | Qwen3-TTS | Voix de synthèse inventées par description | Apache-2.0 | https://github.com/QwenLM/Qwen3-TTS |
 | Chatterbox Multilingual | Voix de synthèse (essai) | MIT | https://github.com/resemble-ai/chatterbox |
