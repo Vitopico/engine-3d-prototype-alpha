@@ -58,9 +58,10 @@ def mat_poils(nom, couleur, pointe=None, aleatoire=0.15, rugosite=0.38, reflet="
     return m
 
 def fourrure(obj, mat, longueur=0.012, densite=900, enfants=6, touffe=0.35, frisure=0.0, rayon_poil=0.0009,
-             gravite=0.15, masque=None, nom="fourrure"):
+             gravite=0.15, masque=None, nom="fourrure", masque_densite=None):
     """Pose une fourrure sur un objet maillé. densite = poils « parents » par m² (chacun porte des « enfants » au rendu).
-    masque(co) -> 0..1 : longueur relative selon la position locale (0 = pas de poil : truffe, yeux…)."""
+    masque(co) -> 0..1 : longueur relative selon la position locale (0 = pas de poil : truffe, yeux…) ;
+    masque_densite(co) -> 0..1 : densité relative (par défaut, le même que la longueur)."""
     if OPTS.get("poils", "1") == "0":
         return None
     me = obj.data
@@ -73,6 +74,10 @@ def fourrure(obj, mat, longueur=0.012, densite=900, enfants=6, touffe=0.35, fris
         for v in me.vertices:
             w = max(0.0, min(1.0, masque(v.co)))
             vg.add([v.index], w, "REPLACE")
+        md = masque_densite or masque
+        vd = obj.vertex_groups.new(name=nom + "_densite")
+        for v in me.vertices:
+            vd.add([v.index], max(0.0, min(1.0, md(v.co))), "REPLACE")
     if mat.name not in [m_.name for m_ in me.materials if m_]:
         me.materials.append(mat)
     idx = [i for i, m_ in enumerate(me.materials) if m_ and m_.name == mat.name][0]
@@ -117,7 +122,7 @@ def fourrure(obj, mat, longueur=0.012, densite=900, enfants=6, touffe=0.35, fris
         pass
     if masque is not None:
         ps.vertex_group_length = nom + "_longueur"
-        ps.vertex_group_density = nom + "_longueur"
+        ps.vertex_group_density = nom + "_densite"
     # les poils se couchent un peu vers l'arrière et vers le bas (sens du pelage), comme une fourrure brossée
     st.use_hair_bspline = True
     st.kink = "NO"
