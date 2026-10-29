@@ -174,7 +174,7 @@ class Rig:
         base = base or {}
         keys = set(pose) | set(base)
         pose = dict(pose)
-        for s, k in (("L", -1), ("R", 1)):          # le bras levé haut entraîne un peu l'épaule
+        for s, _sg in (("L", -1), ("R", 1)):        # le bras levé haut entraîne un peu l'épaule (ne pas écraser k : le dosage)
             bx, by, bz = pose.get(f"bras.{s}", (0, 0, 0))
             if abs(by) > 60 and f"epaule.{s}" not in pose:
                 pose[f"epaule.{s}"] = (0, by * 0.18, 0)
