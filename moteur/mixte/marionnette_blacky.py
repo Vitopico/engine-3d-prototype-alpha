@@ -26,6 +26,9 @@ valeur constante avant la première et après la dernière clé) :
   yeux          0..1   1 = ouverts (clignements automatiques), 0 = fermés
   clignement    0/1    1 = clignements automatiques irréguliers (toutes les 2,5 à 5 s, ~0,15 s)
   respiration   0..    amplitude de la respiration (défaut 1)
+  jappe         instants [t1, t2, ...] (un jappement de 0,38 s chacun) OU courbe [[t, 0/1], ...] :
+                tête « gueule ouverte + yeux fermés », petit coup de tête vers le haut (~4°, la tête se
+                soulève et bascule légèrement, côtés alternés) et oreilles qui sautent
 Tout est déterministe (fonction du temps t uniquement).
 """
 import json, math, os, sys
@@ -105,7 +108,7 @@ class Rig:
         self.N = int(self.R['n_etoiles'])
         self.xc, self.sol = float(self.R['x_centre']), float(self.R['sol_y'])
         self.P = {}
-        noms = ORDRE + (['tete_yeux_fermes'] if 'tete_yeux_fermes' in self.R['pieces'] else [])
+        noms = ORDRE + [v for v in ('tete_yeux_fermes', 'tete_jappe') if v in self.R['pieces']]
         for nom in noms:
             d = self.R['pieces'][nom]
             pd = os.path.join(dossier, 'pieces')
@@ -253,7 +256,17 @@ class Jeu:
         g = lambda k, t: courbe(self.j.get(k), t, DEFAUTS[k])
         tete_c = np.array([g('tete', t) for t in ts])
         self.tete = ressort(tete_c, self.dt, 1.7, 0.42, tete_c[0])
-        o_c = np.array([g('oreilles', t) for t in ts])
+        # jappements : instants de départ (liste de nombres) ou fronts montants d'une courbe 0/1
+        jp = self.j.get('jappe')
+        self.jappe_courbe = None; self.jappes = []
+        if isinstance(jp, list) and jp and not isinstance(jp[0], (list, tuple)):
+            self.jappes = sorted(float(x) for x in jp)
+        elif jp is not None:
+            self.jappe_courbe = jp
+            v = np.array([courbe(jp, t, 0.0) for t in ts])
+            self.jappes = [float(ts[i]) for i in range(1, len(v)) if v[i] >= 0.5 > v[i - 1]]
+        self.coup = np.array([self.impulsion(t) for t in ts])
+        o_c = np.array([g('oreilles', t) for t in ts]) + 0.7 * self.coup
         def cible_or(o, cote):
             return cote * (16.0 * o if o > 0 else 8.0 * o)
         cg = np.array([cible_or(o, 1) for o in o_c]) - 0.45 * self.tete
@@ -270,6 +283,28 @@ class Jeu:
         self.cligne = []; tb = t0 + 1.1 + rng.uniform(0, 1.0)
         while tb < t0 + duree + 1:
             self.cligne.append(tb); tb += rng.uniform(2.5, 5.0)
+
+    def impulsion(self, t):
+        e = 0.0
+        for tb in self.jappes:
+            d = t - tb
+            if 0 <= d < 0.9:
+                e = max(e, d / 0.07 if d < 0.07 else math.exp(-(d - 0.07) / 0.13))
+        return e
+
+    def cote(self, t):
+        k = sum(1 for tb in self.jappes if tb <= t)
+        return 1.0 if k % 2 else -1.0
+
+    def gueule(self, t):
+        if self.jappe_courbe is not None:
+            return min(max(courbe(self.jappe_courbe, t, 0.0), 0.0), 1.0)
+        w = 0.0
+        for tb in self.jappes:
+            d = t - tb
+            if -0.04 < d < 0.42:
+                w = max(w, 1.0 if 0 <= d <= 0.38 else (1 + d / 0.04 if d < 0 else 1 - (d - 0.38) / 0.04))
+        return w
 
     def ix(self, t):
         return min(int(round((t - self.t0) / self.dt)), len(self.ts) - 1)
@@ -301,8 +336,9 @@ def pose(rig, J, t):
     Bd = autour(G, rot(rb) @ np.diag([sx, sy]))
     # tête : inclinaison (ressort) + tremblement
     cou = rig.P['tete']['piv']['cou']
-    a = J.tete[k] + tr * 1.5 * bruit(t, 3, 15) + 0.4 * b
-    Hd = Bd @ autour(cou, rot(a)) @ aff(np.eye(2), (0, -1.5 * b))
+    cp = J.coup[k]                       # coup de tête du jappement (~4°, la tête se soulève)
+    a = J.tete[k] + tr * 1.5 * bruit(t, 3, 15) + 0.4 * b + 4.0 * cp * J.cote(t)
+    Hd = Bd @ autour(cou, rot(a) @ np.diag([1.0, 1 + 0.025 * cp])) @ aff(np.eye(2), (0, -1.5 * b - 11.0 * cp))
     # oreilles
     mats = {'corps': Bd, 'tete': Hd}
     o = J.o_val[k]
@@ -330,7 +366,7 @@ def pose(rig, J, t):
             ak = (rig.N - g) / max(rig.N - 1, 1) * (1 - wl)
             niv[g] = lisse((L - ak) / wl)
         niv[0] = max(L, 0)
-    return mats, pli, niv, J.val('etoile_queue', t), J.fermeture(t)
+    return mats, pli, niv, J.val('etoile_queue', t), J.fermeture(t), J.gueule(t)
 
 
 def rendre_calque(plan, rig_dossier):
@@ -348,7 +384,7 @@ def rendre_calque(plan, rig_dossier):
         # source -> écran
         S = np.eye(3); S[0, 0] = S[1, 1] = ech
         S[0, 2] = cam_x + ech * xm - ech * rig.xc; S[1, 2] = sol_y - ech * rig.sol
-        mats, pli, niv, nq, ferme = pose(rig, J, t)
+        mats, pli, niv, nq, ferme, gueule = pose(rig, J, t)
         c = np.zeros((h, w, 4), np.float32)
         # ombre de contact douce (fixe au sol)
         om = np.zeros((h, w), np.float32); cx = cam_x + ech * xm
@@ -366,12 +402,17 @@ def rendre_calque(plan, rig_dossier):
                 continue
             if nom == 'etoile_queue':
                 img = couleur_piece(p, niv, niveau_seul=nq)
+            elif nom == 'tete' and 'tete_jappe' in rig.P and gueule >= 0.999:
+                colle(c, couleur_piece(rig.P['tete_jappe'], niv), S @ mats['tete'] @ rig.p2s('tete_jappe'))
+                continue
             elif nom == 'tete' and yf is not None and ferme > 0:
                 mel = (p['n'] * (1 - ferme) + yf['n'] * ferme, p['e'] * (1 - ferme) + yf['e'] * ferme)
                 img = couleur_piece(p, niv, melange=mel)
             else:
                 img = couleur_piece(p, niv)
             colle(c, img, S @ mats[nom] @ rig.p2s(nom))
+            if nom == 'tete' and 'tete_jappe' in rig.P and gueule > 0:      # fondu d'entrée/sortie (1 image)
+                colle(c, couleur_piece(rig.P['tete_jappe'], niv) * gueule, S @ mats['tete'] @ rig.p2s('tete_jappe'))
         out.write(np.clip(c * 255 + 0.5, 0, 255).astype(np.uint8).tobytes())
     out.flush()
 
