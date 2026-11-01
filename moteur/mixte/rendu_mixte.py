@@ -31,7 +31,8 @@ import numpy as np
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 ACTIONS = {"marche": os.path.join(ICI, "marionnette_marche.py"),
-           "blacky_assis": os.path.join(ICI, "marionnette_blacky.py")}
+           "blacky_assis": os.path.join(ICI, "marionnette_blacky.py"),
+           "face_debout": os.path.join(ICI, "marionnette_face.py")}
 
 
 def lire_png_premult(chemin):
