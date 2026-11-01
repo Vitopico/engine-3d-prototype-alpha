@@ -32,7 +32,8 @@ RIG_DIR = _opt('--rig', sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].sta
 OUT = _opt('--sortie', RIG_DIR)          # sorties des essais (vidéos, planches) ; le rig n'est jamais modifié
 CALQUE = _opt('--calque')                # mode moteur : écrit les images RGBA du personnage seul sur stdout
 APERCU = '--apercu' in sys.argv
-DECONTRACTE = '--decontracte' in sys.argv   # jeu d'enfant décontracté (retour de l'auteur)
+HUMAIN = '--humain' in sys.argv             # marche « plus humaine » (retour de l'auteur, 1er novembre 2026)
+DECONTRACTE = ('--decontracte' in sys.argv) or HUMAIN   # jeu d'enfant décontracté (retour de l'auteur)
 DEC_TALON = float(os.environ.get('DEC_TALON', '0.466'))   # début du talon levé (fraction de cycle)
 DEC_EXPO = float(os.environ.get('DEC_EXPO', '1.6'))      # forme de la montée sur la pointe
 DEC_DECOL = float(os.environ.get('DEC_DECOL', '0.654'))   # décollage des orteils
@@ -252,7 +253,7 @@ def beliere_monde(t):
 
 def _simule_pendule():
     dt = 1.0 / (FPS * 40)
-    T0, T1 = -8.0, 12.0
+    T0, T1 = -8.0, 40.0
     n = int((T1 - T0) / dt)
     th, om = 0.0, 0.0
     w0 = math.sqrt(G_PX / L_PEND)
@@ -496,6 +497,52 @@ if V3 and DECONTRACTE:
     BRAS_DEC = 23.0           # ± degrés à l'épaule
     AMORT = 0.15              # boussole : pendule moins amorti, réagit plus au rebond
 
+if HUMAIN:
+    # ---------------------------------------------------------- marche plus humaine
+    # 1. vitesse du bassin non constante (un vrai marcheur « pousse » à chaque pas, il ne glisse
+    #    pas comme sur un tapis roulant) : ±AX px source, deux fois par cycle ;
+    # 2. tête portée par un ressort amorti (elle suit le rebond et l'élan avec retard, au lieu
+    #    d'un sinus parfait) ;
+    # 3. respiration lente du torse et épaules plus mobiles.
+    AX = float(os.environ.get("HUM_AX", "4.0")); PHX = float(os.environ.get("HUM_PHX", "0.0"))
+    def hanche_x(t):
+        return V * t + AX * math.sin(2 * math.pi * (2 * t / CYCLE) + PHX)
+    _torse_dec = _torse
+    def _torse(t):
+        return _torse_dec(t) + 0.5 * math.sin(2 * math.pi * t / 3.4 + 0.4)
+    def hanche(t):
+        y0 = float(np.interp(t % CYCLE, TS_B, Y_B, period=CYCLE))
+        g = 1.0 - 0.04 * (1 + varie(t, 2))
+        hx = hanche_x(t); hy = Y_CREUX - g * (Y_CREUX - y0)
+        # l'élan avance parfois le bassin : on l'abaisse juste assez pour que les deux
+        # jambes l'atteignent encore (pieds toujours verrouillés, aucune jambe « pincée »)
+        lmax = (L1 + L2) * 0.998
+        for etat in pieds(t):
+            dx = etat[0][0] - hx
+            if abs(dx) < lmax:
+                hy = max(hy, etat[0][1] - math.sqrt(lmax * lmax - dx * dx))
+        return np.array([hx, hy])
+
+    def _simule_tete():
+        dt = 1.0 / (FPS * 20); T0, T1 = -4.0, 40.0
+        w0 = 2 * math.pi * 2.6; z = 0.32
+        th = om = 0.0; ts, ths = [], []
+        def acc(t):
+            e = 1e-3
+            return (hanche(t + e) - 2 * hanche(t) + hanche(t - e)) / (e * e)
+        for i in range(int((T1 - T0) / dt)):
+            tt = T0 + i * dt; a = acc(tt)
+            # la tête (masse au-dessus du cou) bascule vers l'avant quand le bassin freine
+            # et vers le bas quand il remonte : couple ~ accélérations (px/s² -> degrés)
+            cible = 0.3 * (-0.0022 * a[0] + 0.0016 * a[1])
+            al = w0 * w0 * (cible - th) - 2 * z * w0 * om
+            om += al * dt; th += om * dt
+            ts.append(tt); ths.append(th)
+        return np.array(ts), np.array(ths)
+    TETE_T, TETE_TH = _simule_tete()
+    def ressort_tete(t):
+        return float(np.interp(t, TETE_T, TETE_TH))
+
 PEND_T, PEND_TH = _simule_pendule()
 
 def pendule(t):
@@ -535,7 +582,7 @@ def pose(t):
         if DECONTRACTE:
             w = w_dec
             # épaules en opposition au bassin : l'épaule avance avec son bras (±2,5 px rig)
-            sh = sh + Rt @ np.array([2.5 * an, 0.0])
+            sh = sh + Rt @ np.array([(5.0 if HUMAIN else 2.5) * an, 0.0])
         a_haut = 90 + lean - a
         a_av = a_haut - e
         a_main = a_av - w
@@ -603,6 +650,8 @@ def pose(t):
         bn = (hanche(t - 0.06)[1] - Y_MIL) / max(Y_DEMI, 1e-6)
         curieux = 1.8 * math.sin(2 * math.pi * t / 3.1 + 0.7) * max(0.0, math.sin(2 * math.pi * t / 5.3)) ** 2
         nod = 2.5 * bn + curieux
+        if HUMAIN:
+            nod = 1.2 * bn + curieux + ressort_tete(t)
     out.append(('tete', False, du_torse('cou'), lean - 0.6 * (lean - 3.0) + nod))
     out.append(('torse', False, hip, lean))
     out.append(('boussole', False, du_torse('beliere'), pendule(t)))
