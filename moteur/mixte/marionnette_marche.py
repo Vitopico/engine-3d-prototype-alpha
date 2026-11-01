@@ -504,12 +504,13 @@ if HUMAIN:
     # 2. tête portée par un ressort amorti (elle suit le rebond et l'élan avec retard, au lieu
     #    d'un sinus parfait) ;
     # 3. respiration lente du torse et épaules plus mobiles.
-    AX = float(os.environ.get("HUM_AX", "4.0")); PHX = float(os.environ.get("HUM_PHX", "0.0"))
+    AX = float(os.environ.get("HUM_AX", "2.0")); PHX = float(os.environ.get("HUM_PHX", "0.0"))
     def hanche_x(t):
         return V * t + AX * math.sin(2 * math.pi * (2 * t / CYCLE) + PHX)
     _torse_dec = _torse
     def _torse(t):
-        return _torse_dec(t) + 0.5 * math.sin(2 * math.pi * t / 3.4 + 0.4)
+        # torse presque immobile : son balancement avant-arrière déplaçait la tête (effet « pigeon »)
+        return 3.0 + 0.7 * math.sin(2 * math.pi * (2 * t / CYCLE) - 3.456) + 0.3 * math.sin(2 * math.pi * t / 3.4 + 0.4)
     def hanche(t):
         y0 = float(np.interp(t % CYCLE, TS_B, Y_B, period=CYCLE))
         g = 1.0 - 0.04 * (1 + varie(t, 2))
@@ -651,8 +652,10 @@ def pose(t):
         curieux = 1.8 * math.sin(2 * math.pi * t / 3.1 + 0.7) * max(0.0, math.sin(2 * math.pi * t / 5.3)) ** 2
         nod = 2.5 * bn + curieux
         if HUMAIN:
-            nod = 1.2 * bn + curieux + ressort_tete(t)
-    out.append(('tete', False, du_torse('cou'), lean - 0.6 * (lean - 3.0) + nod))
+            # tête STABLE (retour de l'auteur : « on dirait un pigeon ») : le regard reste
+            # fixe, la tête compense l'inclinaison du torse ; seul un regard curieux, lent
+            nod = 0.6 * curieux
+    out.append(('tete', False, du_torse('cou'), (3.0 + 0.15 * (lean - 3.0) if HUMAIN else lean - 0.6 * (lean - 3.0)) + nod))
     out.append(('torse', False, hip, lean))
     out.append(('boussole', False, du_torse('beliere'), pendule(t)))
     out += bras(phi, False)
