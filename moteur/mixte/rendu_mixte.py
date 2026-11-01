@@ -18,7 +18,9 @@ Format du plan (chemins relatifs au fichier du plan) :
   "decor": {"couches": [{"fichier": "fond.png", "profondeur": 3.0, "y": 0, "devant": false, "repete": true}],
             "profondeur_sol": 1.0},
   "acteurs": [{"nom": "pico", "action": "marche", "rig": "…/rig_profil", "options": ["--decontracte"],
-               "ech": 0.52, "sol_y": 604, "t0": 0.0}],
+               "ech": 0.52, "sol_y": 604, "t0": 0.0},
+              {"nom": "blacky", "action": "blacky_assis", "rig": "…/rig_face_assis", "ech": 0.17, "sol_y": 604,
+               "x": 0, "jeu": {"tremblement": [[0, 1], [2, 0]], "oreilles": [[0, -1], [5, 1]]}}],
   "etalonnage": {"teinte": [1.0, 1.0, 1.0], "vignettage": 0.22, "grain": 0.018},
   "sons": [{"fichier": "pas.wav", "t": 0.0, "gain_db": 0}]
 }
@@ -28,7 +30,8 @@ import cv2
 import numpy as np
 
 ICI = os.path.dirname(os.path.abspath(__file__))
-ACTIONS = {"marche": os.path.join(ICI, "marionnette_marche.py")}
+ACTIONS = {"marche": os.path.join(ICI, "marionnette_marche.py"),
+           "blacky_assis": os.path.join(ICI, "marionnette_blacky.py")}
 
 
 def lire_png_premult(chemin):
@@ -138,6 +141,10 @@ def lancer_acteur(act, plan, cam_x, dossier_tmp):
                 if 0 <= k0 + i < n:
                     vis[k0 + i] = v
         spec["visemes"] = vis
+    # champs de jeu propres à certaines marionnettes (ex. blacky_assis) : x monde, courbes de jeu
+    for cle in ("x", "jeu"):
+        if cle in act:
+            spec[cle] = act[cle]
     chemin = os.path.join(dossier_tmp, f"acteur_{act['nom']}.json")
     json.dump(spec, open(chemin, "w"))
     return subprocess.Popen([sys.executable, ACTIONS[act["action"]], "--rig", act["rig"], *act.get("options", []),
