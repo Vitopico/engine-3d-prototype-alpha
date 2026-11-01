@@ -47,6 +47,15 @@ ZONE = 0.10                        # demi-largeur de la zone de pli : 10 % de la
 PDIR = os.path.join(RIG_DIR, 'pieces')
 RIG = json.load(open(os.path.join(PDIR, 'rig.json')))
 P = RIG['pieces']
+BOUCHES = {}                      # visème du moteur -> pièce de tête (rig['bouches'], facultatif)
+_VERS_BOUCHE = {'ferme': 'ferme', 'ouv1': 'I', 'ouv2': 'E', 'ouv3': 'A', 'o': 'O'}
+if 'bouches' in RIG and 'tete' in P:
+    for _v, _fich in RIG['bouches']['visemes'].items():
+        _nom = 'tete' if _v == 'ferme' else 'tete_' + _v
+        if _nom not in P:
+            P[_nom] = dict(P['tete'], fichier=_fich)
+    for _vm, _b in _VERS_BOUCHE.items():
+        BOUCHES[_vm] = 'tete' if _b == 'ferme' else 'tete_' + _b
 KRIG = float(RIG.get('echelle_rig', 1.0))      # pixels pièce -> unités du rig
 for _d in P.values():
     _d['pivots'] = {k: [v[0] * KRIG, v[1] * KRIG] for k, v in _d['pivots'].items()}
@@ -758,7 +767,7 @@ def dessine_perso(canvas, items, cam_x, sol_y, ech, pivkey):
         roi = canvas[y0:y1, x0:x1]
         roi[:] = warped[..., :roi.shape[2]] + roi * (1 - warped[..., 3:4])
 
-PIVOT = {'tete': 'cou', 'torse': 'hanche', 'boussole': 'beliere', 'manche': 'epaule',
+PIVOT = {'tete': 'cou', 'tete_A': 'cou', 'tete_E': 'cou', 'tete_O': 'cou', 'tete_I': 'cou', 'torse': 'hanche', 'boussole': 'beliere', 'manche': 'epaule',
          'bras_haut': 'epaule', 'avant_bras': 'coude', 'main': 'poignet',
          'cuisse': 'hanche', 'tibia': 'genou', 'pied': 'cheville', 'orteils': 'appui_avant',
          'jambe': 'genou', 'bras': 'coude'}
@@ -1031,6 +1040,10 @@ def rendre_calque(plan):
     for f in range(n):
         t = t0 + f / fps
         items, infos = pose(t)
+        vis = plan.get('visemes')        # un visème du moteur par image du plan (levres.py), facultatif
+        if vis and BOUCHES:
+            v = vis[f] if f < len(vis) else 'ferme'
+            items = [(BOUCHES.get(v, 'tete'),) + tuple(it[1:]) if it[0] == 'tete' else it for it in items]
         cam_x = float(plan['cam_x'][min(f, len(plan['cam_x']) - 1)])
         c = np.zeros((h, w, 4), np.float32)
         # ombres : noir prémultiplié (assombrit le décor de la même façon que l'essai validé)

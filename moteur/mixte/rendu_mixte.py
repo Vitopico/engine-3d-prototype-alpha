@@ -128,6 +128,16 @@ def lancer_acteur(act, plan, cam_x, dossier_tmp):
     w, h, fps = plan["largeur"], plan["hauteur"], plan["fps"]
     spec = {"duree": plan["duree"], "fps": fps, "largeur": w, "hauteur": h, "ech": act.get("ech", 0.52),
             "sol_y": act.get("sol_y", 604), "t0": act.get("t0", 0.0), "cam_x": [float(x) for x in cam_x]}
+    # répliques : visèmes (levres.py) placés au temps de la réplique dans le plan
+    if act.get("repliques"):
+        n = int(round(plan["duree"] * fps)); vis = ["ferme"] * n
+        for r in act["repliques"]:
+            d = json.load(open(r["visemes"]))
+            k0 = int(round(float(r.get("t", 0)) * fps))
+            for i, v in enumerate(d["visemes"]):
+                if 0 <= k0 + i < n:
+                    vis[k0 + i] = v
+        spec["visemes"] = vis
     chemin = os.path.join(dossier_tmp, f"acteur_{act['nom']}.json")
     json.dump(spec, open(chemin, "w"))
     return subprocess.Popen([sys.executable, ACTIONS[act["action"]], "--rig", act["rig"], *act.get("options", []),
@@ -164,6 +174,11 @@ def rendre(plan_chemin, sortie, apercu=None):
     plan.setdefault("fps", 24); plan.setdefault("largeur", 1280); plan.setdefault("hauteur", 720)
     for a in plan["acteurs"]:
         a["rig"] = os.path.normpath(os.path.join(base, a["rig"]))
+        for r in a.get("repliques", []):
+            r["visemes"] = os.path.normpath(os.path.join(base, r["visemes"]))
+            # la voix de la réplique rejoint la bande son du plan
+            plan.setdefault("sons", []).append({"fichier": os.path.normpath(os.path.join(base, r["voix"])),
+                                                "t": r.get("t", 0), "gain_db": r.get("gain_db", 0)})
     w, h, fps = plan["largeur"], plan["hauteur"], plan["fps"]
     n = int(round(plan["duree"] * fps))
     cam = cameras(plan, n, fps)
