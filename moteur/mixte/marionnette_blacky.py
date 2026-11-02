@@ -27,9 +27,13 @@ valeur constante avant la première et après la dernière clé) :
   clignement    0/1    1 = clignements automatiques irréguliers (toutes les 2,5 à 5 s, ~0,15 s)
   respiration   0..    amplitude de la respiration (défaut 1)
   jappe         instants [t1, t2, ...] (un jappement de 0,38 s chacun) OU courbe [[t, 0/1], ...] :
-                tête « gueule ouverte + yeux fermés », petit coup de tête vers le haut (~4°, la tête se
+                tête « gueule ouverte » du rig (pièce tete_jappe), petit coup de tête vers le haut (~4°, la tête se
                 soulève et bascule légèrement, côtés alternés) et oreilles qui sautent
 Tout est déterministe (fonction du temps t uniquement).
+
+rig.json, facultatif : « reglages » : {« echelle_geometrie » : k} -> les amplitudes exprimées en pixels
+source (ombre de contact, soulèvement de la tête, oreilles, respiration, halo des étoiles) sont
+multipliées par k (1 = ancien Blacky, 962 px de haut ; rig_face_assis_v2 : hauteur / 962).
 """
 import json, math, os, sys
 import cv2
@@ -105,6 +109,7 @@ class Rig:
     def __init__(self, dossier, ech):
         self.R = json.load(open(os.path.join(dossier, 'rig.json')))
         self.ech = ech
+        self.K = float((self.R.get('reglages') or {}).get('echelle_geometrie', 1.0))
         self.N = int(self.R['n_etoiles'])
         self.xc, self.sol = float(self.R['x_centre']), float(self.R['sol_y'])
         self.P = {}
@@ -130,7 +135,7 @@ class Rig:
             lum = np.clip((n_src[..., :3] - e_src[..., :3]).max(2), 0, 1)
             if nom == 'etoile_queue':
                 lum = n_src[..., 3] * np.clip(n_src[..., 2] - 0.3, 0, 1)
-            hl = cv2.GaussianBlur(lum, (0, 0), 9.0) * 2.2 + cv2.GaussianBlur(lum, (0, 0), 3.0) * 0.8
+            hl = cv2.GaussianBlur(lum, (0, 0), 9.0 * self.K) * 2.2 + cv2.GaussianBlur(lum, (0, 0), 3.0 * self.K) * 0.8
             hl = cv2.resize(hl, taille, interpolation=cv2.INTER_AREA)
             halo = np.zeros(n.shape, np.float32); halo[..., :3] = hl[..., None] * OR_HALO
             ox, oy = d['origine_source']
@@ -338,14 +343,15 @@ def pose(rig, J, t):
     cou = rig.P['tete']['piv']['cou']
     cp = J.coup[k]                       # coup de tête du jappement (~4°, la tête se soulève)
     a = J.tete[k] + tr * 1.5 * bruit(t, 3, 15) + 0.4 * b + 4.0 * cp * J.cote(t)
-    Hd = Bd @ autour(cou, rot(a) @ np.diag([1.0, 1 + 0.025 * cp])) @ aff(np.eye(2), (0, -1.5 * b - 11.0 * cp))
+    K = rig.K
+    Hd = Bd @ autour(cou, rot(a) @ np.diag([1.0, 1 + 0.025 * cp])) @ aff(np.eye(2), (0, (-1.5 * b - 11.0 * cp) * K))
     # oreilles
     mats = {'corps': Bd, 'tete': Hd}
     o = J.o_val[k]
     for nom, angle, gr in (('oreille_g', J.or_g[k], 4), ('oreille_d', J.or_d[k], 5)):
         piv = rig.P[nom]['piv']['attache']
         fr = tr * 4.5 * bruit(t, gr, 19)
-        lift = -6.0 * max(o, 0.0)
+        lift = -6.0 * K * max(o, 0.0)
         S = np.diag([1.0, 1 + 0.06 * min(o, 0.0)])
         mats[nom] = Hd @ aff(np.eye(2), (0, lift)) @ autour(piv, rot(angle + fr) @ S)
     # queue
@@ -387,13 +393,13 @@ def rendre_calque(plan, rig_dossier):
         mats, pli, niv, nq, ferme, gueule = pose(rig, J, t)
         c = np.zeros((h, w, 4), np.float32)
         # ombre de contact douce (fixe au sol)
-        om = np.zeros((h, w), np.float32); cx = cam_x + ech * xm
-        cv2.ellipse(om, (int(cx * 4), int((sol_y + 1) * 4)), (int(ech * 250 * 4), int(max(3.0, ech * 26) * 4)), 0, 0, 360,
+        om = np.zeros((h, w), np.float32); cx = cam_x + ech * xm; ek = ech * rig.K
+        cv2.ellipse(om, (int(cx * 4), int((sol_y + 1) * 4)), (int(ek * 250 * 4), int(max(3.0, ek * 26) * 4)), 0, 0, 360,
                     0.22, -1, cv2.LINE_AA, shift=2)
         for px in (-125, 125):
-            cv2.ellipse(om, (int((cx + ech * px) * 4), int((sol_y + 0.5) * 4)),
-                        (int(ech * 85 * 4), int(max(2.0, ech * 12) * 4)), 0, 0, 360, 0.30, -1, cv2.LINE_AA, shift=2)
-        c[..., 3] = cv2.GaussianBlur(om, (0, 0), max(1.5, ech * 9)) * 0.7
+            cv2.ellipse(om, (int((cx + ek * px) * 4), int((sol_y + 0.5) * 4)),
+                        (int(ek * 85 * 4), int(max(2.0, ek * 12) * 4)), 0, 0, 360, 0.30, -1, cv2.LINE_AA, shift=2)
+        c[..., 3] = cv2.GaussianBlur(om, (0, 0), max(1.5, ek * 9)) * 0.7
         for nom in ORDRE:
             p = rig.P[nom]
             if nom == 'queue':
