@@ -32,7 +32,8 @@ import numpy as np
 ICI = os.path.dirname(os.path.abspath(__file__))
 ACTIONS = {"marche": os.path.join(ICI, "marionnette_marche.py"),
            "blacky_assis": os.path.join(ICI, "marionnette_blacky.py"),
-           "face_debout": os.path.join(ICI, "marionnette_face.py")}
+           "face_debout": os.path.join(ICI, "marionnette_face.py"),
+           "pose_vivante": os.path.join(ICI, "pose_vivante.py")}
 
 
 def lire_png_premult(chemin):
@@ -134,14 +135,18 @@ def lancer_acteur(act, plan, cam_x, dossier_tmp):
             "sol_y": act.get("sol_y", 604), "t0": act.get("t0", 0.0), "cam_x": [float(x) for x in cam_x]}
     # répliques : visèmes (levres.py) placés au temps de la réplique dans le plan
     if act.get("repliques"):
-        n = int(round(plan["duree"] * fps)); vis = ["ferme"] * n
+        n = int(round(plan["duree"] * fps)); vis = ["ferme"] * n; poids = [None] * n
         for r in act["repliques"]:
             d = json.load(open(r["visemes"]))
             k0 = int(round(float(r.get("t", 0)) * fps))
             for i, v in enumerate(d["visemes"]):
                 if 0 <= k0 + i < n:
                     vis[k0 + i] = v
+                    if d.get("poids") and i < len(d["poids"]):
+                        poids[k0 + i] = d["poids"][i]
         spec["visemes"] = vis
+        if any(poids):
+            spec["visemes_poids"] = poids          # dosage continu des formes (bouches procédurales)
     # champs de jeu propres à certaines marionnettes (ex. blacky_assis) : x monde, courbes de jeu
     for cle in ("x", "jeu"):
         if cle in act:
